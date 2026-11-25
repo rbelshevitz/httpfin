@@ -42,6 +42,37 @@
 - [ ] Подключать WAF, API gateway или service mesh только после проверки
   результатов shadow mode.
 
+## Интеграция с Fail2ban
+
+- [ ] Определить стабильный построчный формат security event для Fail2ban:
+  timestamp, source IP, endpoint, reason code, confidence и correlation ID;
+  не писать в ban-log URL, токены, cookies и полный User-Agent.
+- [ ] Добавить opt-in security log или exporter отдельно от человекочитаемого
+  отчёта и JSON API наблюдений.
+- [ ] Подготовить пример `jail.local` и filter для повторяющихся и объяснимых
+  событий: превышение rate limit, abuse авторизации, malformed requests или
+  решение будущего policy-gatekeeper.
+- [ ] Добавить режим `dry-run`/observe-only и явный порог срабатываний до
+  включения действия firewall.
+- [ ] Описать настройку trusted proxy, чтобы Fail2ban блокировал реальный IP
+  только при правильно настроенной и доверенной цепочке proxy.
+- [ ] Проверить IPv4, IPv6, NAT, общий корпоративный egress, CDN-адреса,
+  container network и firewall backends `nftables`/`iptables`.
+- [ ] Явно описать срок блокировки, recovery, allowlist, ignore rules и
+  аварийный unban; значение по умолчанию должно безопасно сохранять доступность
+  API.
+- [ ] Не блокировать только по User-Agent, JA3/JA4 или heuristic browser
+  profile; объединять повторяемое поведение с rate, authentication, session и
+  контекстом endpoint.
+- [ ] Добавить integration tests: вредоносный клиент вызывает временную
+  блокировку, но не может внедрить произвольный source IP или reason в поток
+  событий Fail2ban.
+
+Источники: [настройка jail в Fail2ban](https://github.com/fail2ban/fail2ban/blob/master/config/jail.conf),
+[разработка и тестирование filter](https://github.com/fail2ban/fail2ban/blob/master/FILTERS),
+[реальный IP за reverse proxy](https://fail2ban.dev/troubleshooting/reverse-proxy-ip/)
+и [примеры для Nginx](https://fail2ban.dev/guides/nginx/).
+
 ## Качество обнаружения
 
 - [ ] Измерять false positive и false negative по endpoint и версии клиента.

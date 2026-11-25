@@ -40,6 +40,38 @@ policy in separate, explicit stages.
 - [ ] Integrate with a WAF, API gateway or service mesh only after shadow-mode
   results are reviewed.
 
+## Fail2ban integration
+
+- [ ] Define a stable, line-oriented security event format for Fail2ban
+  ingestion: timestamp, source IP, endpoint, reason code, confidence, and
+  correlation ID; never put raw URLs, tokens, cookies, or full User-Agent data
+  into the ban log.
+- [ ] Add an opt-in security log or exporter separate from the human report and
+  JSON observation API.
+- [ ] Provide a sample `jail.local` and filter for repeated, explainable
+  failures such as rate-limit violations, authentication abuse, malformed
+  requests, or a policy decision from the future gatekeeper.
+- [ ] Support `dry-run`/observe-only mode and an explicit ban threshold before
+  any firewall action is enabled.
+- [ ] Document trusted proxy configuration so Fail2ban bans the real client IP
+  only when the proxy chain is authenticated and configured correctly.
+- [ ] Test IPv4, IPv6, NAT, shared corporate egress, CDN addresses, container
+  networks, and firewall backends such as nftables and iptables.
+- [ ] Make ban duration, recovery, allowlists, ignore rules, and emergency
+  unban procedures explicit; keep the default action fail-safe for API
+  availability.
+- [ ] Do not ban solely on User-Agent, JA3/JA4, or a heuristic browser profile;
+  combine repeated behavior with rate, authentication, session, and endpoint
+  context.
+- [ ] Add integration tests that verify a malicious client can trigger a
+  temporary ban without allowing an attacker to inject an arbitrary source IP
+  or reason into the Fail2ban event stream.
+
+References: [Fail2ban jail configuration](https://github.com/fail2ban/fail2ban/blob/master/config/jail.conf),
+[filter development and test guidance](https://github.com/fail2ban/fail2ban/blob/master/FILTERS),
+[reverse-proxy client IP guidance](https://fail2ban.dev/troubleshooting/reverse-proxy-ip/),
+and [Nginx-specific Fail2ban examples](https://fail2ban.dev/guides/nginx/).
+
 ## Detection quality
 
 - [ ] Measure false-positive and false-negative rates by endpoint and client
