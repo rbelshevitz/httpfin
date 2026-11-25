@@ -114,7 +114,10 @@ See [`nginx-module/README.md`](nginx-module/README.md) and
 - heuristic profiles for desktop and mobile clients such as `Chrome-like`,
   `Chrome Android-like`, `Edge-like`, `Firefox-like`, `Samsung Internet-like`,
   `Android WebView-like`, or `Generic HTTP`;
-- JA3/JA4 and HTTP/2 values only when supplied by a suitable wire observer.
+- The current Nginx HTTP module does not produce JA3/JA4 or connection-level
+  HTTP/2 fingerprints. Those fields appear only when a separate TLS/HTTP2
+  observer captures ClientHello and connection frames at an earlier observation
+  point and passes the values to `httpfin`.
 
 User-Agent and fingerprints are client-controlled or imitable signals. An
 empty fingerprint means that the observation point did not have the required
