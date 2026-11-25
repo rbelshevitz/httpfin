@@ -84,7 +84,34 @@ curl_ff117 --compressed https://api.example.test/health
 - одинаковый fingerprint на login и scraping endpoints;
 - неожиданное отсутствие SNI или ALPN.
 
-httpfin должен выдавать evidence для расследования, а не единолично принимать решение о блокировке. OWASP рекомендует начинать с пассивных network-level signals и ограничивать срок хранения fingerprint-данных. ([OWASP Bot Management](https://cheatsheetseries.owasp.org/cheatsheets/Bot_Management_and_Anti-Automation_Cheat_Sheet.html))
+`httpfin` должен предоставлять данные для расследования, а не единолично
+принимать решение о блокировке. OWASP рекомендует начинать с пассивных
+сетевых признаков и ограничивать срок хранения fingerprint-данных.
+([OWASP Bot Management](https://cheatsheetseries.owasp.org/cheatsheets/Bot_Management_and_Anti-Automation_Cheat_Sheet.html))
+
+### Практический anti-bot workflow
+
+Используйте `httpfin` как точку наблюдения и сравнения, а не как блокировщик:
+
+1. **Собрать:** зафиксировать на edge User-Agent, адрес источника, запрос,
+   status, timing, TLS version, SNI и ALPN — только там, где эти поля видны.
+2. **Сравнить:** сопоставить заявленный профиль браузера с транспортными
+   признаками и baseline, привязанным к версии. User-Agent Chrome при общих
+   признаках библиотечного клиента — это сигнал для проверки, а не готовый
+   вердикт.
+3. **Обогатить:** объединить отчёт со счётчиками rate limit, событиями
+   аутентификации, поведением сессии и результатами приложения. Эти данные не
+   входят в текущую ответственность модуля и Go collector.
+4. **Проверить:** исследовать один fingerprint на множестве адресов, рост
+   401/403/429, неожиданный drift профиля и повторяемые шаблоны запросов.
+5. **Применить policy отдельно:** WAF, gateway или приложение решает, нужен ли
+   challenge, throttle или block. `httpfin` лучше оставлять read-only в пути
+   запроса.
+
+Текущий Nginx handoff передаёт request/TLS metadata, но не считает JA3, JA4 и
+   HTTP/2 fingerprint. Для этого нужен внешний wire-observer. В Nginx-сценарии
+текущий профиль также остаётся `Unknown`; прямой Go HTTPS listener умеет
+классифицировать заявленный User-Agent, но это всё равно эвристика.
 
 ## Интеграция со Swagger / OpenAPI
 
@@ -108,10 +135,11 @@ OpenAPI здесь нужен как стабильное описание colle
 
 ## Nginx: три варианта
 
-### Вариант A — access log + Go collector
+### Вариант A — access log + внешний log consumer
 
-Nginx терминирует TLS и пишет `httpfin.jsonl`; Go-процесс читает/агрегирует
-его. Это самый простой вариант для существующего ingress: не нужен C ABI, а
+Nginx терминирует TLS и пишет `httpfin.jsonl`; отдельный log consumer читает и
+агрегирует его. Текущий процесс `httpfin` не читает файл Nginx автоматически.
+Это самый простой вариант для существующего ingress: не нужен C ABI, а
 обновление Nginx-модуля не входит в rollout. Минус — в access log нет полного
 исходного ClientHello.
 

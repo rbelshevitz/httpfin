@@ -48,6 +48,30 @@ the same profile on login and scraping endpoints, or missing SNI/ALPN.
 blocking decision. Combine signals with rate limits, authentication, IP
 reputation and session behavior. See the [OWASP Bot Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Bot_Management_and_Anti-Automation_Cheat_Sheet.html).
 
+### A practical anti-bot workflow
+
+Use `httpfin` as an observation and comparison point, not as the blocker:
+
+1. **Collect:** capture User-Agent, source address, request, status, timing,
+   TLS version, SNI and ALPN at the edge where they are visible.
+2. **Compare:** compare the claimed browser profile with transport signals and
+   a versioned baseline. A Chrome User-Agent with generic transport behavior is
+   a review signal, not a verdict.
+3. **Enrich:** join the report with rate-limit counters, authentication events,
+   session behavior and application outcomes. These data are outside the
+   native module and Go collector's current scope.
+4. **Review:** investigate clusters such as one fingerprint across many
+   addresses, repeated 401/403/429 responses, or a sudden profile drift.
+5. **Apply policy elsewhere:** let a WAF, gateway or application policy decide
+   whether to challenge, throttle or block. Keep `httpfin` read-only in the
+   request path.
+
+The current Nginx handoff supplies request/TLS metadata but does not calculate
+JA3, JA4 or HTTP/2 fingerprints. Those fields require an external wire
+observer. The current Nginx path also leaves the inferred profile as
+`Unknown`; direct Go HTTPS mode can classify the declared User-Agent, but that
+classification is still heuristic.
+
 ## Swagger / OpenAPI
 
 The OpenAPI file describes the `httpfin` API, not a browser identity. Import
@@ -63,8 +87,9 @@ curl --fail http://127.0.0.1:8080/api/report
 
 ## Nginx choices
 
-- **Access log + Go collector:** easiest retrofit; no C ABI dependency, but no
-  raw ClientHello.
+- **Access log + external log consumer:** easiest retrofit; the current
+  `httpfin` Go process does not read an Nginx log file automatically and there
+  is no raw ClientHello in an ordinary access log.
 - **TCP passthrough + `ssl_preread`:** exposes SNI/ALPN for routing, but not
   HTTP method, URL or headers.
 - **Native module + Unix datagram:** sends a bounded structured event with
