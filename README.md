@@ -40,6 +40,30 @@ Available endpoints:
 - `/healthz` — health check;
 - `/` — local UI.
 
+## Where httpfin is placed
+
+The main deployment is an HTTP observer behind the TLS termination point:
+
+```text
+client -- TLS --> Nginx -- HTTP --> application
+                    |
+                    └─ httpfin module → Go report/API
+```
+
+Nginx owns the certificate and decrypts the connection. The module then sees
+the HTTP request, the negotiated TLS version, SNI and ALPN. This is the mode
+supported by the current product and Docker example.
+
+In TLS passthrough mode, Nginx only forwards encrypted bytes to another TLS
+endpoint. `httpfin` does not see the HTTP request there. Nginx `ssl_preread`
+can expose SNI and offered ALPN for routing, but it does not provide a full
+ClientHello fingerprint to this HTTP module.
+
+`ClientHello` is the first TLS handshake message sent by the client. It contains
+the offered TLS versions, cipher suites and extensions. JA3/JA4 are derived
+from such handshake data. Capturing them requires a separate TLS-aware proxy or
+wire observer before TLS termination; it is not part of the current module.
+
 Reports are generated on request and are not written to a server-side report
 directory. The redirected file is created by the shell running `curl`.
 
