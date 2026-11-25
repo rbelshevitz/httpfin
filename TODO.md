@@ -4,6 +4,19 @@ The next direction is an anti-bot gatekeeper in front of an API. Keep the
 current inspector useful as a read-only diagnostic component while adding
 policy in separate, explicit stages.
 
+## Immediate priorities
+
+1. **Wire observer:** capture raw ClientHello and HTTP/2 connection evidence;
+   calculate real JA3/JA4 where the observation point permits it, or preserve a
+   precise raw summary when it does not.
+2. **Durable storage and loss metrics:** retain observations across restarts
+   and expose received, dropped, backpressure, and ingest-health counters.
+3. **Explainable reports:** show which fields disagree, where each field was
+   observed, and why a comparison is `matched`, `mismatch`, or `unknown`.
+
+Anti-bot policy remains downstream of these diagnostic capabilities. It must not
+become the primary purpose of the project.
+
 ## Before expanding detection
 
 - [x] Build the Nginx module against the pinned Nginx source and run the full
