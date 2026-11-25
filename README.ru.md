@@ -89,6 +89,21 @@ curl -k --resolve inspector.example.test:8443:127.0.0.1 \
   https://inspector.example.test:8443/api/report > httpfin-report.txt
 ```
 
+Если Compose-плагин недоступен, образ собирается и запускается обычным Docker:
+
+```bash
+docker build --pull=false -t httpfin:local .
+docker run -d --rm --name httpfin -p 8443:8443 httpfin:local
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/healthz
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/api/report > httpfin-report.txt
+docker rm -f httpfin
+```
+
+При ошибке DNS во время установки пакетов Alpine повторите сборку с сетью
+хоста: `docker build --network=host --pull=false -t httpfin:local .`.
+
 Тестовый entrypoint создаёт короткоживущий self-signed сертификат. В production
 настоящие сертификат и ключ нужно монтировать в Nginx как секреты только для
 чтения. Если TLS завершается в Nginx, сборщику Go не нужен доступ к закрытому
@@ -181,7 +196,9 @@ go vet ./...
 ./tests/container-smoke.sh
 ```
 
-Последние две проверки требуют локальные зависимости сборки Nginx и Docker.
+Проверка исходника модуля не требует Docker. Контейнерная smoke-проверка
+требует Docker и Compose-плагин; при его отсутствии можно использовать
+обычную сборку и запуск Docker из примера выше.
 
 Полную сборку Docker/Nginx-модуля можно запустить вручную в GitHub Actions через
 workflow `Manual Docker build`. Она намеренно отделена от быстрого CI.

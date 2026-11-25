@@ -1,65 +1,116 @@
-# How teams use httpfin
+# How to use httpfin
 
-`httpfin` is a network observation point for answering what reached an API,
-through which TLS/HTTP path, and with what result.
+Place `httpfin` in front of a test or production API. It does not replace the
+API, modify requests, or block clients. Its job is to show what reached the
+entry point: HTTP fields, User-Agent, available TLS signals, and the request
+result.
 
-## DevOps / SRE
+## Main workflow
 
-After changing TLS, HTTP/2, proxy protocol, real-IP handling or an upstream:
-
-1. run `httpfin` beside a test ingress;
-2. send the same request through Nginx and directly to the application;
-3. compare SNI, ALPN, protocol, source address, latency, status and bytes;
-4. keep `/api/report` as the rollout artifact.
-
-This exposes lost client IPs, HTTP/2-to-HTTP/1.1 changes, incorrect virtual
-host selection, hidden TLS termination and upstream latency differences.
-
-## API QA
-
-API tests usually assert JSON and status only. `httpfin` adds protocol context:
-HTTP version, offered and negotiated ALPN, SNI, timing, bytes, User-Agent and
-profile consistency.
-
-```bash
-curl -sS https://api.example.test/health
-curl_chrome116 --compressed https://api.example.test/health
-curl_ff117 --compressed https://api.example.test/health
+```text
+client → Nginx with httpfin → API under test
+                         └──→ httpfin report
 ```
 
-Keep the report with the test run. Negative cases should include missing SNI,
-unsupported ALPN, HTTP/1.1 instead of HTTP/2, a false Chrome User-Agent, and
-trusted versus untrusted proxy paths.
+In the recommended mode, Nginx terminates TLS and the module sends an event to
+the Go collector:
 
-## Backend teams
-
-When one SDK receives a different result from another, send both variants to
-`httpfin` and compare method, URL, headers, body size, protocol, TLS, latency
-and status. This is useful during migrations between `net/http`, libcurl,
-mobile SDKs, gRPC gateways and service-mesh sidecars.
-
-## Swagger / OpenAPI
-
-The OpenAPI file describes the `httpfin` API, not a browser identity. Import
-[`docs/openapi.yaml`](openapi.yaml) into Swagger Editor, Insomnia or Postman,
-or use it to generate a typed client.
+1. send the same request through the Nginx entry point;
+2. verify the API result: status, body, and data changes;
+3. find the request in `/api/connections`;
+4. save `/api/report` with the test result or defect.
 
 ```bash
-go run ./cmd/httpfin &
-curl --fail http://127.0.0.1:8080/healthz
-curl --fail http://127.0.0.1:8080/api/connections
-curl --fail http://127.0.0.1:8080/api/report
+curl -fsS https://api.example.test/health
+curl -fsS https://api.example.test/health \
+  -H 'User-Agent: QA-client/1.0'
+curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
 ```
 
-## Nginx choices
+The first two requests go to the API under test. The last request goes to the
+`httpfin` collector and saves its report. `/healthz`, `/api/connections`, and
+`/api/report` belong to `httpfin`, not to the product API.
 
-- **Access log + external log consumer:** easiest retrofit; the current
-  `httpfin` Go process does not read an Nginx log file automatically and there
-  is no raw ClientHello in an ordinary access log.
-- **TCP passthrough + `ssl_preread`:** exposes SNI/ALPN for routing, but not
-  HTTP method, URL or headers.
-- **Native module + Unix datagram:** sends a bounded structured event with
-  request ID, HTTP fields, TLS version, SNI and negotiated ALPN.
+## What each team checks
 
-The module is best-effort and non-blocking. Keep storage, classification,
-baselines and reports in Go. See [Nginx dynamic modules](https://docs.nginx.com/nginx/admin-guide/dynamic-modules/).
+### DevOps and SRE
+
+After changing Nginx, TLS, proxy settings, real-IP handling, or an upstream,
+compare a direct request with one through the entry point:
+
+- client address;
+- Host and SNI;
+- ALPN and HTTP version;
+- negotiated TLS version;
+- response status;
+- the event in the report and access log.
+
+Take request time and response size from the Nginx access log: the current
+module does not pass those fields in every mode.
+
+This helps find lost client addresses, wrong virtual hosts, HTTP/2 to HTTP/1.1
+changes, and latency introduced between the edge and the application.
+
+### API QA
+
+Run the same API test with each relevant client: desktop browser, mobile
+browser, WebView, SDK, and a generic HTTP client. Compare in the report:
+
+- User-Agent and the detected profile;
+- method, path, and status;
+- protocol, TLS, SNI, and ALPN when available;
+- changes between sequential observations;
+- absence of secrets in the saved report.
+
+Add timing and response size from the access log when performance matters.
+
+If the API response changed, compare the client reports first. If only a
+transport signal changed, check the browser, SDK, proxy, or TLS-library update;
+that signal alone does not prove a client defect.
+
+### API and SDK developers
+
+When two clients receive different results, send both through the same
+observation point and compare method, URL, Host, User-Agent, protocol, TLS,
+timing, status, and response size. Take timing and size from the access log or
+direct Go observation. This helps separate application defects from client,
+proxy, or Nginx differences.
+
+## Reading the report
+
+The report shows:
+
+- which clients were observed and how many requests they made;
+- the latest User-Agent profile;
+- available transport signals;
+- changes from the previous observation for the same address;
+- whether a baseline is available and needs review.
+
+`Unknown`, `unknown`, and `unavailable` mean that evidence is missing. They do
+not mean a mismatch. User-Agent and profiles can be spoofed, so the report is
+diagnostic evidence, not proof of client identity.
+
+## Choosing a mode
+
+| Scenario | What httpfin sees | Use it when |
+|---|---|---|
+| Nginx terminates TLS | HTTP, User-Agent, status, and available TLS fields | Main deployment in front of an API |
+| `httpfin` accepts HTTPS directly | HTTP, SNI, and ALPN after terminating TLS | Debugging TLS without Nginx |
+| Nginx `stream` with `ssl_preread` | ClientHello routing signals | Passthrough only; no HTTP report |
+
+With TLS passthrough, `httpfin` cannot see the URL, headers, User-Agent, or
+response status. In the ordinary Nginx HTTP module, the original ClientHello is
+already unavailable, so JA3/JA4 and connection-level HTTP/2 fingerprints do not
+appear automatically.
+
+## What not to assume
+
+- User-Agent or a profile is proof of a browser;
+- missing JA3/JA4 is an error in the ordinary mode;
+- the report is a complete request log: observations are kept in memory;
+- `httpfin` blocks requests or controls the firewall;
+- `httpfin` service endpoints are not the same as the API under test.
+
+See [`OPERATING_MODES.md`](OPERATING_MODES.md) for TLS, certificates, and Nginx
+deployment. See [`INTEGRATION_FORMAT.md`](INTEGRATION_FORMAT.md) for the event
+and report format.

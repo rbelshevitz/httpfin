@@ -88,6 +88,22 @@ curl -k --resolve inspector.example.test:8443:127.0.0.1 \
   https://inspector.example.test:8443/api/report > httpfin-report.txt
 ```
 
+If the Compose plugin is unavailable, build and run the image with Docker
+directly:
+
+```bash
+docker build --pull=false -t httpfin:local .
+docker run -d --rm --name httpfin -p 8443:8443 httpfin:local
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/healthz
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/api/report > httpfin-report.txt
+docker rm -f httpfin
+```
+
+If Alpine package installation fails with a DNS error, retry with the host
+network: `docker build --network=host --pull=false -t httpfin:local .`.
+
 The example entrypoint creates a short-lived self-signed certificate. In
 production, mount the real certificate and key into Nginx as read-only secrets.
 The Go collector does not need the private key when Nginx terminates TLS. This
@@ -179,7 +195,9 @@ go vet ./...
 ./tests/container-smoke.sh
 ```
 
-The last two checks require the local Nginx build prerequisites and Docker.
+The module source check does not require Docker. The container smoke test
+requires Docker and the Compose plugin; without it, use the direct Docker
+build and run commands above.
 
 The full Docker/Nginx module build is available manually from GitHub Actions as
 `Manual Docker build`. It is intentionally separate from the fast CI check.

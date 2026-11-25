@@ -21,7 +21,7 @@ ingress и приложением. Перед запуском нужно выб
 
 ```bash
 go run ./cmd/httpfin
-curl -v http://127.0.0.1:8080/api/health
+curl -v http://127.0.0.1:8080/healthz
 curl -v -X POST http://127.0.0.1:8080/login \
   -H 'content-type: application/json' \
   -d '{"test":true}'

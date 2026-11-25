@@ -52,4 +52,6 @@ smoke assertion is the event visible through the Go API.
 
 If Docker or Compose is unavailable, the script exits successfully with a
 `SKIP` message. This makes it suitable for environments where Docker cannot be
-run; the command remains reproducible when Docker is available.
+run; the command remains reproducible when Docker and Compose are available.
+When only the Docker CLI is available, use the direct `docker build` and
+`docker run` smoke path documented in the main README.
