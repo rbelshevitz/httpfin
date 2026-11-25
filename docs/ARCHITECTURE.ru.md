@@ -84,6 +84,19 @@ Native-модуль работает только внутри HTTP-жизнен
 preread-модуль, не proxy и не policy engine. Для passthrough SNI/ALPN используется
 отдельный `ngx_stream_ssl_preread_module` Nginx.
 
+## Матрица компонентов
+
+| Развёртывание | Go-исполняемый файл | Native-модуль | Результат |
+|---|---:|---:|---|
+| Прямая отладка HTTP/HTTPS | да | нет | Go API, UI, отчёты и прямое TLS-наблюдение |
+| Анализ access log Nginx | внешний collector по необходимости | нет | access log Nginx без handoff-модуля |
+| Nginx termination и структурированный анализ httpfin | да | да | data-plane Nginx плюс Go API, UI и отчёты |
+| Только passthrough-маршрутизация Nginx | нет | нет HTTP-модуля | SNI/ALPN preread и stream routing |
+
+Go-исполняемый файл — не библиотека-помощник для `.so`, а consumer и
+analysis-сервис. Native-модуль — адаптер, который делает request-данные Nginx
+доступными этому сервису.
+
 Datagram — best-effort telemetry. Access log остаётся операционным резервом при
 недоступном сокете или backpressure.
 

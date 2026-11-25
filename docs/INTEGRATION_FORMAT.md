@@ -16,6 +16,41 @@ The event is best-effort telemetry. The module must not wait for Go, perform
 DNS/HTTP/database work, or calculate expensive fingerprints inside an Nginx
 worker.
 
+## Why the module exists and whether Go is required
+
+For an API developer, the short answer is: the usual deployment runs two
+processes, Nginx and `httpfin`. Nginx receives the request; `httpfin` exposes
+the result through the UI, JSON API and TXT report. The module connects them.
+
+The module is useful when Nginx is already the TLS terminator and proxy, but
+the team needs a structured handoff that is richer and more immediate than
+parsing access logs. It adds request ID, selected HTTP fields, TLS variables
+and delivery status without moving storage or analysis into an Nginx worker.
+
+For the native-module integration, the Go executable is required:
+
+```text
+Nginx worker
+  └─ ngx_http_httpfin_module.so
+       └─ bounded Unix datagram
+            └─ httpfin Go executable
+                 ├─ in-memory store
+                 ├─ profile/risk/baseline processing
+                 ├─ /api/connections and /api/report
+                 └─ inspector UI
+```
+
+The `.so` alone has no report storage, UI, API or durable queue. If the Go
+socket consumer is absent, the module can only mark the event unavailable or
+drop it; Nginx request processing continues. If only access logs are needed,
+do not load the module. If direct HTTPS observation is sufficient, run the Go
+executable without Nginx. The module + Go pair is the production integration
+path for Nginx termination plus structured analysis.
+
+You do not call the `.so` directly: Nginx loads it with `load_module`. You do
+not write a Unix-socket client: `httpfin` creates and listens on the socket. In
+Docker, one entrypoint starts both processes.
+
 ## Event fields
 
 The module sends version `1` JSON containing request ID, method, URI, host,

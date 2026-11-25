@@ -144,6 +144,12 @@ integration layer: снимает request/TLS-поля, создаёт request I
 ограниченное событие в Go. Он не разбирает raw ClientHello и не участвует в
 `stream ssl_preread`.
 
+Проще говоря: Nginx принимает запрос, модуль копирует его короткое описание,
+а Go принимает это описание, сохраняет его и строит API, UI и отчёт. Если Go
+запускается напрямую, Nginx-модуль не нужен. Если Nginx работает с модулем,
+рядом с ним нужно запустить Go-исполняемый файл — это локальный приёмник
+событий.
+
 Для TLS без termination Nginx может использовать `ngx_stream_ssl_preread_module` и получить SNI/ALPN из ClientHello. Для точного JA3/JA4 нужен raw ClientHello или полноценный preread-парсер. После TLS termination нужно передать в Go хотя бы `$ssl_protocol`, `$ssl_alpn_protocol`, `$ssl_cipher`, `$ssl_server_name`, `$http_user_agent` и исходный IP.
 
 Отдельный preread-конфиг для SNI/ALPN находится в [`configs/nginx/httpfin-stream.conf`](configs/nginx/httpfin-stream.conf). Он не видит HTTP после TLS и потому используется для маршрутизации и stream-диагностики, а не для полного отчёта запроса.

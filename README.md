@@ -131,6 +131,11 @@ request context in `NGX_HTTP_POST_READ_PHASE` and emits one event in
 `NGX_HTTP_LOG_PHASE`, after the final request status is available. It is not a
 raw ClientHello parser and does not participate in `stream ssl_preread`.
 
+In plain terms: Nginx receives the request, the module copies a small summary,
+and the Go program receives that summary and builds the API, UI and report. If
+you run Go directly, you do not need the Nginx module. If you run Nginx with
+the module, you also run the Go executable as its local event consumer.
+
 ```text
 client → Nginx / ingress → application
              │

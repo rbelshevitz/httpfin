@@ -84,6 +84,19 @@ The module is therefore a request-to-collector handoff at the HTTP layer, not
 a TLS preread module, proxy, or policy engine. `ngx_stream_ssl_preread_module`
 is a separate Nginx stream module used for passthrough SNI/ALPN routing.
 
+## Component decision matrix
+
+| Deployment | Go executable | Native module | What you get |
+|---|---:|---:|---|
+| Direct HTTP/HTTPS debugging | yes | no | Go API, UI, reports and direct TLS observation |
+| Nginx access-log analysis | optional external collector | no | Nginx request log; no module handoff |
+| Nginx termination with structured httpfin analysis | yes | yes | Nginx data plane plus Go API, UI and reports |
+| Nginx passthrough routing only | no | no HTTP module | SNI/ALPN preread and stream routing |
+
+The Go executable is not a helper library for the `.so`; it is the consumer and
+analysis service. The native module is an adapter that makes Nginx request data
+available to that service.
+
 The datagram is best-effort telemetry. Access logs remain the operational
 fallback when a collector socket is unavailable or under backpressure.
 
