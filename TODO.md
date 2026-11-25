@@ -40,8 +40,8 @@ proxy. It does not provide standard JA3/JA4 in the Nginx HTTP-module path.
   pass the result into the report. This is a new input mode, not a change to
   the current Nginx HTTP module.
 - [ ] Only if the direct listener is insufficient, evaluate a dedicated
-  reverse proxy or passive wire observer. A MITM proxy is not required by the
-  supported product topology.
+  reverse proxy or a separate passive TLS program. A MITM proxy is not required
+  by the supported product topology.
 
 ## Later, only if required
 

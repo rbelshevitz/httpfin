@@ -159,7 +159,7 @@ changed by a proxy, or deliberately imitated.
 |---|---|---|---|
 | JA3 | TLS client fingerprint | normalized ClientHello version, cipher suites, extensions, supported groups and point formats, then an MD5 digest | not computed by the current Nginx HTTP module |
 | JA3S | TLS server-response fingerprint | selected fields from the ServerHello response | not collected |
-| JA4 | newer TLS client fingerprint in the FoxIO JA4+ family | ClientHello-derived, normalized into a readable three-part value | requires a raw TLS observer and an implementation |
+| JA4 | newer TLS client fingerprint in the FoxIO JA4+ family | ClientHello-derived, normalized into a readable three-part value | requires a separate program that reads TLS before termination |
 | JA4H | HTTP client fingerprint in JA4+ | HTTP request behavior and headers | requires an HTTP-aware collector; not inferred from one handoff event |
 | JA4+ | family name | TLS, HTTP, TCP, X.509, SSH and other methods such as JA4, JA4H, JA4T and JA4X | reference terminology only |
 
@@ -167,7 +167,7 @@ JA3 is a method for grouping similar TLS handshakes, not a browser identity.
 JA4 is not an RFC-defined protocol field; it is a separate fingerprinting
 method. Exact values require the corresponding raw traffic and the same
 algorithm/version as the reference implementation. `httpfin` currently keeps
-JA3/JA4/HTTP2 fields empty unless an external observer supplies them.
+JA3/JA4/HTTP2 fields empty unless a separate program supplies them.
 
 ## Scientific basis
 

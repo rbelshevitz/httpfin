@@ -37,7 +37,7 @@ func Load(path string) (*Set, error) {
 	return &set, nil
 }
 
-// Observe enriches a connection without making a blocking decision. A
+// Observe enriches a connection without making an access decision. A
 // signature known to another declared browser profile is a mismatch signal;
 // an unknown signature remains explicitly unknown.
 func (s *Set) Observe(c model.Connection) model.Connection {

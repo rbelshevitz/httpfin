@@ -105,7 +105,8 @@ observation for the same client IP; missing evidence is rendered as `unknown`,
 not as a mismatch. Sensitive query parameters are redacted at the report
 boundary. Use JSON in CI and dashboards; attach TXT to a ticket or test result.
 Empty
-JA3/JA4/HTTP/2 fields mean that the required wire observation was unavailable.
+JA3/JA4/HTTP/2 fields mean that the required separate TLS/HTTP2 program was
+not connected or did not provide those values.
 
 Reports are generated synchronously from the current in-memory store when
 `GET /api/report` is handled. No report file is created by the service. A file

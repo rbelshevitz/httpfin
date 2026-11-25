@@ -157,7 +157,7 @@ fingerprinting, а не механизмы аутентификации: оди�
 |---|---|---|---|
 | JA3 | fingerprint TLS-клиента | нормализованные version, cipher suites, extensions, supported groups и point formats ClientHello, затем MD5 | текущий Nginx HTTP-модуль не считает |
 | JA3S | fingerprint ответа TLS-сервера | выбранные поля ответа ServerHello | не собирается |
-| JA4 | новый fingerprint TLS-клиента из семейства FoxIO JA4+ | данные ClientHello, нормализованные в читаемое значение из трёх частей | нужен raw TLS observer и отдельная реализация |
+| JA4 | новый fingerprint TLS-клиента из семейства FoxIO JA4+ | данные ClientHello, нормализованные в читаемое значение из трёх частей | нужна отдельная программа, читающая TLS до termination |
 | JA4H | fingerprint HTTP-клиента в JA4+ | поведение HTTP-запроса и headers | нужен HTTP-aware collector; из одного handoff-события не выводится |
 | JA4+ | название семейства | методы для TLS, HTTP, TCP, X.509, SSH и др.: JA4, JA4H, JA4T, JA4X | только справочная терминология |
 
@@ -165,7 +165,7 @@ JA3 группирует похожие TLS handshakes, но не удостов
 является полем RFC, а отдельным методом fingerprinting. Для точного значения
 нужны соответствующие raw-данные и та же версия алгоритма, что у reference
 implementation. Сейчас `httpfin` оставляет JA3/JA4/HTTP2 пустыми, если их не
-передал внешний observer.
+передала отдельная программа.
 
 ## Техническая база
 

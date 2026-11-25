@@ -329,5 +329,4 @@ go vet ./...
 - [NGINX HTTP log module](https://nginx.org/en/docs/http/ngx_http_log_module.html) — `log_format` и access log;
 - [NGINX SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html) — SNI/ALPN без termination;
 - [curl-impersonate](https://github.com/lwthiker/curl-impersonate) и [Quick Start](https://curl-impersonate.readthedocs.io/en/latest/quick_start.html) — эталонные browser-like запросы;
-- [OWASP Bot Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Bot_Management_and_Anti-Automation_Cheat_Sheet.html) — практическая интерпретация network signals;
 - [Squid logformat](https://www.squid-cache.org/Doc/config/logformat/) — модель access-отчёта.
