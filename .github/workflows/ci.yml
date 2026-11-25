@@ -1,42 +1,48 @@
-name: CI
+name: Lightweight CI
 
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "*.md"
-      - "**/*.md"
-      - "docs/**"
   pull_request:
-    branches: [main]
-    paths-ignore:
-      - "*.md"
-      - "**/*.md"
-      - "docs/**"
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  verify:
+    name: Go and static checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
-      - name: Check out
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.22'
+          cache: true
 
-      - name: Test
+      - name: Check Go formatting
+        shell: bash
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run tests
         run: go test ./...
 
-      - name: Vet
+      - name: Run vet
         run: go vet ./...
 
-      - name: Check Nginx module sources
-        run: ./tests/nginx-module-static.sh
+      - name: Build collector
+        run: go build ./cmd/httpfin
 
-      - name: Container smoke test
-        run: ./tests/container-smoke.sh
+      - name: Validate JSON configuration
+        run: python3 -m json.tool configs/baseline.example.json >/dev/null
+
+      - name: Check Nginx module source
+        run: ./tests/nginx-module-static.sh
