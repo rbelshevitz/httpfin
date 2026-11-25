@@ -111,7 +111,8 @@ server {
 services:
   httpfin:
     volumes:
-      - /etc/letsencrypt/live/api.example.test:/etc/nginx/tls:ro
+      - /etc/letsencrypt/live/api.example.test/fullchain.pem:/etc/nginx/certs/server.crt:ro
+      - /etc/letsencrypt/live/api.example.test/privkey.pem:/etc/nginx/certs/server.key:ro
 ```
 
 Встроенный Docker-пример `httpfin` генерирует временный self-signed сертификат

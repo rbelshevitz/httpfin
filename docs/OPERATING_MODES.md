@@ -43,6 +43,21 @@ the certificate and key into the Nginx container as a secret or read-only
 volume. The Docker example generates a short-lived self-signed certificate
 only for its `inspector.example.test` smoke test.
 
+The bundled Docker Nginx configuration reads these paths:
+
+```yaml
+services:
+  httpfin:
+    volumes:
+      - /etc/letsencrypt/live/api.example.test/fullchain.pem:/etc/nginx/certs/server.crt:ro
+      - /etc/letsencrypt/live/api.example.test/privkey.pem:/etc/nginx/certs/server.key:ro
+```
+
+For a host-installed Nginx, use the same idea with paths such as
+`/etc/nginx/tls/api.example.test.fullchain.pem` and
+`/etc/nginx/tls/api.example.test.key`, and reference them from
+`ssl_certificate` and `ssl_certificate_key`.
+
 After termination, the original ClientHello is not forwarded to the upstream.
 Use Nginx TLS variables for operational diagnostics. Exact JA3/JA4 requires
 capturing ClientHello before termination.
