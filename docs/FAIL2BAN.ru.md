@@ -11,6 +11,10 @@ httpfin_security_log=/var/log/httpfin/security.log go run ./cmd/httpfin
 HTTP status `401`, `403` и `429`; прикладной смысл authentication или rate
 limit он пока не знает.
 
+Только для container smoke test переменная `httpfin_test_endpoint=1` включает
+закрытый endpoint `/__httpfin_test/unauthorized`. По умолчанию он выключен и не
+должен включаться в production.
+
 Anti-bot policy отделён от этого общего abuse-сигнала. Он пишет
 `event=bot_suspected` только при наличии двух независимых mismatch-признаков.
 Первое действие — `decision=observe`; один User-Agent не превращается в бан.

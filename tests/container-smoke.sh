@@ -50,6 +50,8 @@ fi
 printf "runtime dependencies: nginx=1.28.3 openssl/pcre2/zlib=present module=no-direct-crypto\\n"
 ')
 printf '%s\n' "$runtime" | grep -Fq 'module=no-direct-crypto'
+HTTPFIN_SECURITY_LOG=/run/httpfin/security.log \
+HTTPFIN_TEST_ENDPOINT=1 \
 $compose up -d httpfin
 
 i=0
@@ -74,5 +76,20 @@ printf '%s\n' "$body" | grep -Fq '"alpn":"h2"'
 logs=$($compose logs --no-color httpfin)
 printf '%s\n' "$logs" | grep -Fq '"sni":"inspector.example.test"'
 printf '%s\n' "$logs" | grep -Eq '"alpn":"(h2|http/1.1)"'
+
+$compose exec -T httpfin wget --no-check-certificate -qO- \
+	--header='Host: inspector.example.test' \
+	https://127.0.0.1:8443/__httpfin_test/unauthorized >/dev/null 2>&1 && {
+	echo "expected test endpoint to return 401" >&2
+	exit 1
+} || true
+
+security_log=$($compose exec -T httpfin sh -c 'cat /run/httpfin/security.log')
+printf '%s\n' "$security_log" | grep -Eq \
+	'event=auth_failure endpoint=/__httpfin_test/unauthorized status=401 reason=invalid_credentials'
+if printf '%s\n' "$security_log" | grep -Eq 'token=|cookie=|authorization='; then
+	echo "security log contains a forbidden secret-like field" >&2
+	exit 1
+fi
 
 echo "httpfin container TLS/SNI -> Nginx module -> Go smoke test passed"

@@ -11,6 +11,10 @@ The default is disabled. The current logger emits bounded events for HTTP
 statuses `401`, `403`, and `429`; it does not know application-specific
 authentication or rate-limit semantics yet.
 
+For container smoke tests only, `httpfin_test_endpoint=1` exposes a gated
+`/__httpfin_test/unauthorized` endpoint. It is disabled by default and must not
+be enabled in a production deployment.
+
 The anti-bot policy is separate. It emits `event=bot_suspected` only when the
 current evidence contains two independent mismatch signals. Its first action is
 `decision=observe`; it never turns a User-Agent string into a ban. A future

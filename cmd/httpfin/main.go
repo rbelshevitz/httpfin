@@ -34,6 +34,11 @@ func main() {
 	mux.HandleFunc("/api/connections", connectionsHandler(store))
 	mux.HandleFunc("/api/report", reportHandler(store))
 	mux.HandleFunc("/healthz", healthHandler(ingestHealthy))
+	if os.Getenv("httpfin_test_endpoint") == "1" {
+		mux.HandleFunc("/__httpfin_test/unauthorized", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+		})
+	}
 	mux.Handle("/", webHandler())
 
 	addr := envOr("httpfin_addr", ":8080")
