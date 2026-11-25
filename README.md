@@ -181,4 +181,7 @@ go vet ./...
 
 The last two checks require the local Nginx build prerequisites and Docker.
 
+The full Docker/Nginx module build is available manually from GitHub Actions as
+`Manual Docker build`. It is intentionally separate from the fast CI check.
+
 Russian documentation: [`README.ru.md`](README.ru.md).

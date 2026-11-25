@@ -1,0 +1,23 @@
+name: Manual Docker build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Nginx and httpfin module
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Build image
+        run: docker build --pull=false -t httpfin:manual-check .
+
+      - name: Check Nginx configuration
+        run: docker run --rm httpfin:manual-check nginx -t

@@ -183,4 +183,7 @@ go vet ./...
 
 Последние две проверки требуют локальные зависимости сборки Nginx и Docker.
 
+Полную сборку Docker/Nginx-модуля можно запустить вручную в GitHub Actions через
+workflow `Manual Docker build`. Она намеренно отделена от быстрого CI.
+
 English documentation: [`README.md`](README.md).
