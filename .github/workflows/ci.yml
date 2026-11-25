@@ -33,7 +33,12 @@ jobs:
         run: test -z "$(gofmt -l .)"
 
       - name: Run tests
-        run: go test ./...
+        shell: bash
+        run: |
+          set -o pipefail
+          go version
+          go env GOMOD GOPATH GOCACHE
+          go test -v -count=1 ./... 2>&1 | tee "$RUNNER_TEMP/httpfin-go-test.log"
 
       - name: Run vet
         run: go vet ./...
