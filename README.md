@@ -1,5 +1,12 @@
 # httpfin — Client Fingerprint Inspector
 
+[![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white)](go.mod)
+[![License](https://img.shields.io/badge/license-MIT-2ea44f?logo=opensourceinitiative&logoColor=white)](LICENSE)
+[![Nginx](https://img.shields.io/badge/Nginx-1.28.3-009639?logo=nginx&logoColor=white)](Dockerfile)
+[![Alpine](https://img.shields.io/badge/Alpine-3.23-0D597F?logo=alpinelinux&logoColor=white)](Dockerfile)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Focus](https://img.shields.io/badge/focus-HTTP%20%2F%20TLS%20diagnostics-6f42c1?logo=wireshark&logoColor=white)](docs/ARCHITECTURE.md)
+
 > **Observe the client. Explain the path.**
 
 `httpfin` is a Go diagnostic service for observing incoming HTTP clients. It
