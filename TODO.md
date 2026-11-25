@@ -31,12 +31,12 @@ and anti-bot signals are supporting evidence, never the sole blocking input.
   datagram overflow, and a slow Go consumer. Nginx must continue serving in all
   three cases, with the loss reason visible to operators.
 
-## Long-term architecture
+## Long-term items — do not pull into current work
 
-- Optional SQLite history for search across restarts; never enable by default.
-- Fingerprint-based blocking requires a separate TLS-aware edge proxy, wire
+- [ ] Optional SQLite history for search across restarts; never enable by default.
+- [ ] Fingerprint-based blocking requires a separate TLS-aware edge proxy, wire
   observer, or direct Go TLS proxy. The current Nginx HTTP module is not enough.
-- Automatic profile updates and distributed storage.
+- [ ] Automatic profile updates and distributed storage.
 
 ## Constraints
 
