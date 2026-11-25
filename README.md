@@ -136,6 +136,10 @@ and the Go program receives that summary and builds the API, UI and report. If
 you run Go directly, you do not need the Nginx module. If you run Nginx with
 the module, you also run the Go executable as its local event consumer.
 
+The handoff is one-way: Go listens on `/run/httpfin/events.sock`, and the Nginx
+module sends one JSON datagram after each request. Go does not connect to the
+module, and no TCP port is needed between them.
+
 ```text
 client → Nginx / ingress → application
              │

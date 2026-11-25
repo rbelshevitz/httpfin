@@ -47,6 +47,23 @@ do not load the module. If direct HTTPS observation is sufficient, run the Go
 executable without Nginx. The module + Go pair is the production integration
 path for Nginx termination plus structured analysis.
 
+### Who connects to whom
+
+The handoff is local and one-way:
+
+1. Go creates and listens on the Unix datagram socket
+   `/run/httpfin/events.sock` at startup.
+2. Each Nginx worker creates a `SOCK_DGRAM` socket and connects it to that path.
+3. After each processed HTTP request, the module sends one JSON event with
+   `send()`.
+4. Go reads the datagram, decodes it into a `Connection`, and adds it to the
+   store.
+
+There is no HTTP request, TCP port, or bidirectional RPC between Nginx and Go.
+Go does not connect to the module: Go listens on the socket, while the module
+sends data to it. If Go has not started or the socket is unavailable, Nginx
+continues serving requests but the telemetry event is lost.
+
 You do not call the `.so` directly: Nginx loads it with `load_module`. You do
 not write a Unix-socket client: `httpfin` creates and listens on the socket. In
 Docker, one entrypoint starts both processes.

@@ -97,6 +97,9 @@ The Go executable is not a helper library for the `.so`; it is the consumer and
 analysis service. The native module is an adapter that makes Nginx request data
 available to that service.
 
+The connection point is a local Unix datagram socket: Go listens on it and the
+Nginx module sends a short JSON event to it. No TCP port is needed between them.
+
 The datagram is best-effort telemetry. Access logs remain the operational
 fallback when a collector socket is unavailable or under backpressure.
 
