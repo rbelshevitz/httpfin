@@ -1,5 +1,7 @@
 # httpfin — Client Fingerprint Inspector
 
+> **Observe the client. Explain the path.**
+
 `httpfin` is a Go diagnostic service for observing incoming HTTP clients. It
 records request metadata, TLS/SNI/ALPN facts available at the observation
 point, a declared User-Agent, and passive fingerprint signals. It produces a
