@@ -112,6 +112,11 @@ to make a request look browser-like. Exact JA3/JA4 and HTTP/2 fingerprints
 require raw ClientHello and HTTP/2 connection-frame observation; they cannot be
 reconstructed honestly from one post-termination HTTP request.
 
+An optional baseline file can be loaded for Go-terminated TLS with
+`httpfin_baseline_file=/etc/httpfin/baseline.json`; see
+[`configs/baseline.example.json`](configs/baseline.example.json). Baselines
+annotate observations and do not block clients by themselves.
+
 `JA3` is a normalized TLS ClientHello fingerprint; `JA3S` describes the server
 response. `JA4` is a newer FoxIO TLS fingerprint, while `JA4H` describes HTTP
 client behavior and `JA4+` names the wider family. These are grouping signals,

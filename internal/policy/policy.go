@@ -14,7 +14,8 @@ func Evaluate(c model.Connection) Decision {
 	if c.ClientHelloSig == "" {
 		return Decision{}
 	}
-	if c.UAConsistency == "Mismatch" && c.BaselineStatus == "Mismatch" {
+	if c.UAConsistency == "Mismatch" && c.BaselineStatus == "Mismatch" &&
+		c.HTTP2Fingerprint != "" {
 		return Decision{Action: "observe", Reason: "ua_tls_baseline_mismatch", Confidence: 0.95}
 	}
 	if c.UAConsistency == "Mismatch" && c.ReferenceProfile != "" &&

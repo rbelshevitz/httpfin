@@ -11,6 +11,7 @@ func TestEvaluateRequiresIndependentSignals(t *testing.T) {
 		t.Fatalf("one signal must not produce a decision: %#v", got)
 	}
 	base.BaselineStatus = "Mismatch"
+	base.HTTP2Fingerprint = "http2-settings"
 	got := Evaluate(base)
 	if got.Action != "observe" || got.Confidence < 0.9 {
 		t.Fatalf("unexpected decision: %#v", got)

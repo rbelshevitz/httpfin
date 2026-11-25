@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"httpfin/internal/baseline"
 	"httpfin/internal/demo"
 	"httpfin/internal/ingest"
 	"httpfin/internal/model"
@@ -20,6 +21,10 @@ import (
 
 func main() {
 	store := model.NewStore(demo.Connections())
+	clientBaseline, err := baseline.Load(os.Getenv("httpfin_baseline_file"))
+	if err != nil {
+		log.Printf("baseline disabled: %v", err)
+	}
 	stopIngest, ingestHealthy, err := ingest.StartUnixDatagram(os.Getenv("httpfin_socket"), store)
 	if err != nil {
 		log.Printf("cannot start ingest: %v", err)
@@ -68,7 +73,7 @@ func main() {
 			log.Printf("httpfin inspector listening on https://%s (SNI + ALPN capture enabled)", tlsAddr)
 			tlsServer = &http.Server{
 				Addr:              tlsAddr,
-				Handler:           NewTLSHandler(mux, store, observer, security),
+				Handler:           NewTLSHandler(mux, store, observer, security, clientBaseline),
 				TLSConfig:         config,
 				ReadHeaderTimeout: 5 * time.Second,
 				ReadTimeout:       15 * time.Second,

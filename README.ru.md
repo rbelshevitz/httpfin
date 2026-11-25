@@ -59,6 +59,11 @@ go run ./cmd/httpfin
 JA3/JA4 будет отдельным parser-модулем: текущая Go-модель не подменяет
 стандартный fingerprint эвристическим хешем.
 
+Для TLS, который завершает Go, можно подключить baseline-файл через
+`httpfin_baseline_file=/etc/httpfin/baseline.json`; пример находится в
+[`configs/baseline.example.json`](configs/baseline.example.json). Baseline
+только добавляет отметки к наблюдениям и сам по себе не блокирует клиентов.
+
 Для native Nginx-модуля можно включить Unix datagram ingest:
 
 ```bash

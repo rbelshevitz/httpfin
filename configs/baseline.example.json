@@ -1,0 +1,15 @@
+{
+  "source": "team-baseline-2026-01",
+  "profiles": [
+    {
+      "name": "Chrome",
+      "version": "stable",
+      "client_hello_signatures": [
+        "replace-with-httpfin-client-hello-summary"
+      ],
+      "http2_fingerprints": [
+        "replace-with-http2-settings-summary"
+      ]
+    }
+  ]
+}

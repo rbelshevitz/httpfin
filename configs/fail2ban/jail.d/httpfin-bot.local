@@ -1,0 +1,10 @@
+[httpfin-bot]
+enabled = false
+filter = httpfin-bot-deny
+logpath = /var/log/httpfin/security.log
+backend = auto
+maxretry = 3
+findtime = 10m
+bantime = 10m
+port = http,https
+banaction = nftables-multiport

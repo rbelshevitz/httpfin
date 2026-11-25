@@ -15,6 +15,9 @@ policy in separate, explicit stages.
 
 - [ ] Define a versioned observation schema for declared, negotiated and
   inferred fields.
+- [x] Add a first baseline-file loader for Go-terminated TLS; keep unknown
+  signatures explicit and never convert a baseline mismatch directly into a
+  ban.
 - [ ] Add a wire-observer integration point for raw ClientHello, JA3/JA4 and
   HTTP/2 connection signals; keep unavailable fields explicit.
 - [ ] Track source, observation point, proxy hop and baseline version for every

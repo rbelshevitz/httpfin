@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"httpfin/internal/baseline"
 	"httpfin/internal/fingerprint"
 	"httpfin/internal/model"
 	"httpfin/internal/policy"
@@ -32,7 +33,7 @@ func requestLogger(next http.Handler, store *model.Store, security *securitylog.
 }
 
 // NewTLSHandler is the integration point for an HTTPS listener that terminates TLS in Go.
-func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.Observer, security *securitylog.Logger) http.Handler {
+func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.Observer, security *securitylog.Logger, clientBaseline *baseline.Set) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		ua := r.UserAgent()
@@ -46,6 +47,7 @@ func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.O
 				c.ALPNOffered = hello.OfferedALPN
 				c.ClientHelloSig = hello.Signature
 			}
+			c = clientBaseline.Observe(c)
 		}
 		writer := &captureWriter{ResponseWriter: w, c: &c}
 		next.ServeHTTP(writer, r)
