@@ -1,0 +1,64 @@
+# httpfin operating modes: use cases, TLS, and certificates
+
+Choose the observation point before deploying `httpfin`.
+
+| Mode | TLS terminator | Certificate for httpfin | Visible data | Best for |
+|---|---|---:|---|---|
+| Plain HTTP API debugging | none | no | HTTP request/response | SDK and API debugging |
+| Direct HTTPS listener | Go/httpfin | yes | TLS, SNI, ALPN, HTTP | ClientHello experiments |
+| Nginx TLS termination | Nginx | no | Nginx TLS fields + HTTP handoff | production ingress |
+| Nginx TLS passthrough | downstream service | no for Nginx | SNI, ALPN, TLS version | routing diagnostics |
+
+## Direct HTTPS
+
+The Go listener needs a certificate and private key because it terminates TLS:
+
+```bash
+httpfin_tls_cert=/etc/httpfin/tls/server.crt \
+httpfin_tls_key=/etc/httpfin/tls/server.key \
+httpfin_tls_addr=:8443 \
+go run ./cmd/httpfin
+```
+
+Use a self-signed certificate for local tests and a certificate for the real
+hostname in shared or production environments. Keep the private key readable
+only by the service account.
+
+## Nginx termination
+
+This is the recommended production topology:
+
+```text
+client --TLS--> Nginx --HTTP/proxy--> application
+                   ├─ certificate/key
+                   ├─ SNI/ALPN/TLS access log
+                   └─ httpfin module -> Unix datagram -> Go collector
+```
+
+The certificate belongs to Nginx; the Go collector does not need one. Mount
+the certificate and key into the Nginx container as a secret or read-only
+volume. The Docker example generates a short-lived self-signed certificate
+only for its `inspector.example.test` smoke test.
+
+After termination, the original ClientHello is not forwarded to the upstream.
+Use Nginx TLS variables for operational diagnostics. Exact JA3/JA4 requires
+capturing ClientHello before termination.
+
+## TLS passthrough
+
+With `stream { ssl_preread on; }`, Nginx does not need a certificate. The
+downstream TLS service owns the certificate. This exposes SNI, ALPN, and TLS
+version, but not HTTP method, URL, headers, status, or User-Agent.
+
+## Practical team workflows
+
+- DevOps/SRE: compare direct and ingress requests after changes to TLS,
+  HTTP/2, real IP, proxy protocol, or upstream routing.
+- API QA: keep baselines for curl, curl-impersonate, SDKs, and browsers; compare
+  transport behavior as well as response bodies.
+- Security: use fingerprints as triage signals and combine them with rate,
+  authentication, IP reputation, and application logs.
+- Incident response: preserve `/api/report`, access logs, Nginx version, and
+  OpenSSL version together so a transport change can be reproduced.
+
+The complete Russian runbook is in [`OPERATING_MODES.ru.md`](OPERATING_MODES.ru.md).

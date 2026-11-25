@@ -1,0 +1,33 @@
+# Load before the events/http blocks. The path must match the module build.
+load_module modules/ngx_http_httpfin_module.so;
+
+http {
+    # One AF_UNIX SOCK_DGRAM consumer per worker process is opened at init.
+    # The Go collector should create this socket before nginx starts/reloads.
+    httpfin_socket /run/httpfin/events.sock;
+
+    log_format httpfin_json escape=json
+        '{"request_id":"$httpfin_request_id",'
+        '"handoff":"$httpfin_handoff_status",'
+        '"remote_addr":"$remote_addr",'
+        '"request":"$request",'
+        '"status":$status,'
+        '"request_time":$request_time,'
+        '"sni":"$ssl_server_name",'
+        '"alpn":"$ssl_alpn_protocol"}';
+
+    server {
+        listen 443 ssl http2;
+        server_name inspector.example.test;
+        httpfin on;
+        access_log /var/log/nginx/httpfin-access.json httpfin_json;
+
+        # Existing TLS termination remains in nginx. The module observes the
+        # HTTP request; TLS/SNI variables come from ngx_http_ssl_module.
+        ssl_certificate     /etc/pki/tls/certs/inspector.crt;
+        ssl_certificate_key /etc/pki/tls/private/inspector.key;
+        location / {
+            proxy_pass http://httpfin_backend;
+        }
+    }
+}

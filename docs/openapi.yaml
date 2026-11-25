@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: httpfin Inspector API
+  version: 0.1.0
+  description: Passive HTTP client and TLS/SNI observation API.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      operationId: health
+      summary: Health check
+      responses:
+        '204':
+          description: Collector is alive.
+  /api/connections:
+    get:
+      operationId: listConnections
+      summary: List observed connections
+      responses:
+        '200':
+          description: Recent observations, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Connection'
+  /api/report:
+    get:
+      operationId: downloadReport
+      summary: Download Squid-style text report
+      responses:
+        '200':
+          description: Plain text report.
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  schemas:
+    Connection:
+      type: object
+      required: [id, timestamp, client_ip, method, url, status, protocol, detected_profile, risk]
+      properties:
+        id: {type: string}
+        timestamp: {type: string, format: date-time}
+        elapsed_ms: {type: integer, format: int64}
+        client_ip: {type: string}
+        method: {type: string}
+        url: {type: string}
+        status: {type: integer, format: int32}
+        bytes: {type: integer, format: int64}
+        user_agent: {type: string}
+        protocol: {type: string}
+        tls_version: {type: string}
+        alpn: {type: string}
+        alpn_offered: {type: string}
+        sni: {type: string}
+        client_hello_signature: {type: string}
+        ja3: {type: string}
+        ja4: {type: string}
+        http2_fingerprint: {type: string}
+        detected_profile: {type: string}
+        ua_consistency: {type: string}
+        risk: {type: string, enum: [Low, Info, Review, High]}
+        reference_profile: {type: string}
+        reference_version: {type: string}
+        reference_source: {type: string}
+        baseline_status: {type: string, enum: [matched, drifted, unknown]}

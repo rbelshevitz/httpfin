@@ -1,0 +1,171 @@
+# httpfin — Client Fingerprint Inspector
+
+`httpfin` is a Go diagnostic service for observing incoming HTTP clients. It
+records request metadata, TLS/SNI/ALPN facts available at the observation
+point, a declared User-Agent, and passive fingerprint signals. It produces a
+compact Squid-style text report and a JSON API.
+
+`curl-impersonate` is used only as a reference traffic generator. The upstream
+project is created and maintained under the GitHub account [`lwthiker`](https://github.com/lwthiker);
+the public profile does not provide a verified legal name. Its browser-like
+TLS and HTTP/2 behavior is useful for regression fixtures, but it can become
+outdated as browsers and TLS stacks change.
+
+## Quick start
+
+```bash
+go run ./cmd/httpfin
+```
+
+Endpoints:
+
+- `GET /api/connections` — recent observations as JSON;
+- `GET /api/report` — readable Squid-style text report;
+- `GET /healthz` — health check.
+
+For the tested Nginx + TLS + native module image:
+
+```bash
+docker compose up --build
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/healthz
+```
+
+The image is a diagnostic example. Its entrypoint creates a short-lived
+self-signed certificate only when no certificate is mounted. Production
+deployments should mount the real certificate and private key into Nginx as a
+read-only secret; the Go collector does not need the key when Nginx terminates
+TLS.
+
+## What can be identified
+
+`httpfin` can reliably record what was observed at its position in the path:
+
+- the complete client-supplied User-Agent string;
+- negotiated TLS version, SNI and ALPN when the observing TLS endpoint has
+  access to them;
+- the offered ALPN list and a stable ClientHello summary when `httpfin` itself
+  terminates TLS;
+- HTTP method, URI, status, timing, bytes and source address;
+- a heuristic profile such as `Chrome-like`, `Firefox-like`, `Safari-like` or
+  `Generic HTTP`.
+
+The profile is an inference, not proof of a real browser. User-Agent is
+client-controlled, and a tool such as `curl-impersonate` is specifically able
+to make a request look browser-like. Exact JA3/JA4 and HTTP/2 fingerprints
+require raw ClientHello and HTTP/2 connection-frame observation; they cannot be
+reconstructed honestly from one post-termination HTTP request.
+
+## Nginx integration
+
+The repository contains a native dynamic Nginx module. It is intentionally
+thin: it creates a request ID, collects bounded request/TLS fields and sends a
+non-blocking Unix datagram to Go. The Go process owns normalization, storage,
+classification, baselines, risk hints and reports.
+
+```text
+client → Nginx / ingress → application
+             │
+             ├─ TLS termination, SNI/ALPN, proxying, access log
+             └─ ngx_http_httpfin_module.so → Unix datagram → Go httpfin
+```
+
+Read [`nginx-module/README.md`](nginx-module/README.md),
+[`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md), and
+[`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md) for module
+build compatibility, TLS certificate placement, passthrough, and operational
+failure modes. The OpenAPI description is in [`docs/openapi.yaml`](docs/openapi.yaml).
+
+## Why the report is useful
+
+The report is useful for API debugging, ingress changes, client-regression
+checks, incident triage, and comparing a claimed browser identity with the
+observed TLS/HTTP behavior. Its value comes from correlation: timestamp,
+request, source, protocol, TLS/SNI/ALPN, User-Agent, profile, and consistency
+are shown together.
+
+It is a diagnostic evidence summary, not an authentication or blocking verdict.
+Use it with rate limits, authentication logs, IP reputation, session behavior,
+and application logs. Empty fingerprint fields mean that the current
+observation point did not have the required wire data; they are not a failed
+request.
+
+## Report purpose and creation
+
+`httpfin` creates a report from observations already held by the Go collector.
+It does not re-scan traffic or invent missing TLS data. Each row combines an
+operational summary with the signals available at the observation point:
+
+- time, request ID, source address, method and URL;
+- status, response size and elapsed time;
+- HTTP protocol, TLS version, SNI and ALPN;
+- User-Agent, inferred profile and consistency result;
+- JA3, JA4 and HTTP/2 fields when a suitable wire observer supplied them.
+
+Create a machine-readable snapshot with:
+
+```bash
+curl -fsS http://127.0.0.1:8080/api/connections > connections.json
+```
+
+Create a human-readable Squid-style artifact with:
+
+```bash
+curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
+```
+
+Use the JSON for CI, dashboards and further processing. Attach the TXT report
+to an incident, rollout or API test result. A blank fingerprint field means
+that the observation point did not receive the required wire data; it must not
+be silently interpreted as a mismatch.
+
+## ⚡ Project goals
+
+`httpfin` answers a practical question: “what client actually reached this
+endpoint, and what changed on the way?” It is designed to help teams:
+
+- ⚡ debug API clients by comparing curl, SDKs, Go/Java/Python clients,
+  browsers, and `curl-impersonate`;
+- ⚡ verify that an ingress or reverse proxy preserves source IP, SNI, ALPN,
+  HTTP version, User-Agent, and timing;
+- ⚡ inspect TLS termination and confirm the negotiated protocol and server name;
+- ⚡ find inconsistencies such as a declared Chrome User-Agent with generic
+  client-like network signals;
+- ⚡ detect regressions after upgrading Nginx, OpenSSL, browsers, SDKs, or
+  proxies;
+- ⚡ compare direct traffic with traffic sent through a proxy, CDN, ingress, or
+  service mesh;
+- ⚡ build a readable incident timeline from client, endpoint, status, and
+  available fingerprint signals;
+- ⚡ provide evidence for security and anti-bot analysis without making an
+  automatic blocking decision inside `httpfin`.
+
+`httpfin` provides an observable technical picture and a useful report for
+DevOps/SRE, API QA, backend, and security teams. It does not replace a WAF,
+SIEM, browser telemetry, or an authentication system.
+
+## Use cases
+
+- compare ordinary curl, `curl-impersonate`, browsers, Go clients and API SDKs;
+- debug an API client or reverse proxy that changes HTTP version, headers, SNI
+  or ALPN;
+- check whether an ingress preserves source identity and request timing;
+- detect drift after upgrading Nginx, OpenSSL, a browser, or a client library;
+- retain a readable incident timeline for DevOps, API QA and security teams.
+
+See [`docs/USE_CASES_TEAM.md`](docs/USE_CASES_TEAM.md) for team-oriented
+runbooks, [`docs/USE_CASES.md`](docs/USE_CASES.md) for practical examples, and
+[`docs/DEVOPS_RUNBOOK.md`](docs/DEVOPS_RUNBOOK.md) for rollout diagnostics.
+
+## References
+
+- [curl-impersonate](https://github.com/lwthiker/curl-impersonate) and its
+  [usage documentation](https://github.com/lwthiker/curl-impersonate/tree/main/docs);
+- [RFC 6066 — SNI](https://www.rfc-editor.org/rfc/rfc6066);
+- [RFC 7301 — ALPN](https://www.rfc-editor.org/rfc/rfc7301);
+- [RFC 9113 — HTTP/2](https://www.rfc-editor.org/rfc/rfc9113);
+- [RFC 9110 — HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110);
+- [Nginx dynamic modules](https://docs.nginx.com/nginx/admin-guide/dynamic-modules/);
+- [Nginx SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html).
+
+Russian documentation: [`README.ru.md`](README.ru.md).

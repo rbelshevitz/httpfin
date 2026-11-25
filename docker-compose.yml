@@ -1,0 +1,8 @@
+services:
+  httpfin:
+    build:
+      context: .
+      args:
+        NGINX_VERSION: "1.28.3"
+    ports:
+      - "8443:8443"
