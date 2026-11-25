@@ -64,6 +64,9 @@ JA3/JA4 будет отдельным parser-модулем: текущая Go-�
 [`configs/baseline.example.json`](configs/baseline.example.json). Baseline
 только добавляет отметки к наблюдениям и сам по себе не блокирует клиентов.
 
+Границы wire observer и ограничения реализации TLS/HTTP2 описаны в
+[`docs/WIRE_OBSERVER.ru.md`](docs/WIRE_OBSERVER.ru.md).
+
 Для native Nginx-модуля можно включить Unix datagram ingest:
 
 ```bash

@@ -117,6 +117,9 @@ An optional baseline file can be loaded for Go-terminated TLS with
 [`configs/baseline.example.json`](configs/baseline.example.json). Baselines
 annotate observations and do not block clients by themselves.
 
+The wire-observer boundary and TLS/HTTP2 implementation limits are documented
+in [`docs/WIRE_OBSERVER.md`](docs/WIRE_OBSERVER.md).
+
 `JA3` is a normalized TLS ClientHello fingerprint; `JA3S` describes the server
 response. `JA4` is a newer FoxIO TLS fingerprint, while `JA4H` describes HTTP
 client behavior and `JA4+` names the wider family. These are grouping signals,
