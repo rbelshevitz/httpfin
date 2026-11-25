@@ -14,7 +14,7 @@ import (
 func TestStartUnixDatagram(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "events.sock")
 	store := model.NewStore(nil)
-	stop, err := StartUnixDatagram(path, store)
+	stop, healthy, err := StartUnixDatagram(path, store)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
 			t.Skip("sandbox disallows Unix datagram sockets")
@@ -22,12 +22,15 @@ func TestStartUnixDatagram(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stop()
+	if !healthy() {
+		t.Fatal("ingest should be healthy after start")
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm()&0o222 != 0o222 {
-		t.Fatalf("unix datagram socket is not writable by nginx workers: mode %o", info.Mode().Perm())
+	if info.Mode().Perm() != 0o660 {
+		t.Fatalf("unix datagram socket has unexpected permissions: mode %o", info.Mode().Perm())
 	}
 	addr, err := net.ResolveUnixAddr("unixgram", path)
 	if err != nil {

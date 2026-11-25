@@ -146,11 +146,15 @@ Each datagram is newline-terminated JSON, capped at 4096 bytes:
 {"version":1,"request_id":"1234-7","method":"GET","uri":"/healthz","host":"example.test","user_agent":"curl/8","remote_addr":"127.0.0.1","status":200,"tls_version":"TLS 1.3","sni":"example.test","alpn":"h2"}
 ```
 
-The consumer owns the socket lifecycle and must bind it before NGINX workers
-start. A datagram socket has finite kernel receive capacity; the module reports
-backpressure but does not retry. The Go side should treat this stream as
-best-effort telemetry and correlate it with NGINX access logs when lossless
-audit records are required.
+The consumer owns the socket lifecycle and should bind it before NGINX workers
+start. The Go collector creates the socket with mode `0660`; set
+`httpfin_socket_group` to the Nginx worker group when the processes use
+different primary groups. A datagram socket has finite kernel receive
+capacity; the module reports backpressure and does not wait for the consumer.
+After a send error it closes its connected socket and retries on a later
+request, so a restarted Go collector can recover without an Nginx reload. The
+stream remains best-effort telemetry; correlate it with NGINX access logs when
+lossless audit records are required.
 
 ## Compatibility caveats
 

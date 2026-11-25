@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"httpfin/internal/fingerprint"
 	"httpfin/internal/model"
 	"httpfin/internal/tlsinspect"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -57,6 +59,19 @@ func (w *statusWriter) Write(p []byte) (int, error) {
 	w.bytes += n
 	return n, err
 }
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return h.Hijack()
+}
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 type captureWriter struct {
 	http.ResponseWriter
@@ -75,3 +90,16 @@ func (w *captureWriter) Write(p []byte) (int, error) {
 	w.c.Bytes += int64(n)
 	return n, err
 }
+func (w *captureWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+func (w *captureWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return h.Hijack()
+}
+func (w *captureWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }

@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"httpfin/internal/demo"
@@ -15,7 +19,7 @@ import (
 
 func main() {
 	store := model.NewStore(demo.Connections())
-	stopIngest, err := ingest.StartUnixDatagram(os.Getenv("httpfin_socket"), store)
+	stopIngest, ingestHealthy, err := ingest.StartUnixDatagram(os.Getenv("httpfin_socket"), store)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,7 +27,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/connections", connectionsHandler(store))
 	mux.HandleFunc("/api/report", reportHandler(store))
-	mux.HandleFunc("/healthz", healthHandler)
+	mux.HandleFunc("/healthz", healthHandler(ingestHealthy))
 	mux.Handle("/", webHandler())
 
 	addr := envOr("httpfin_addr", ":8080")
@@ -39,36 +43,57 @@ func main() {
 		MaxHeaderBytes:    64 << 10,
 	}
 	go func() { errCh <- plainServer.ListenAndServe() }()
+	var tlsServer *http.Server
+	var tlsListener net.Listener
 	if cert, key, ok := tlsinspect.EnvTLSConfigured(); ok {
 		observer := tlsinspect.NewObserver()
 		config, err := tlsinspect.Config(cert, key, observer)
 		if err != nil {
-			log.Fatal(err)
-		}
-		tlsAddr := envOr("httpfin_tls_addr", ":8443")
-		log.Printf("httpfin inspector listening on https://%s (SNI + ALPN capture enabled)", tlsAddr)
-		server := &http.Server{
-			Addr:              tlsAddr,
-			Handler:           NewTLSHandler(mux, store, observer),
-			TLSConfig:         config,
-			ReadHeaderTimeout: 5 * time.Second,
-			ReadTimeout:       15 * time.Second,
-			WriteTimeout:      30 * time.Second,
-			IdleTimeout:       60 * time.Second,
-			MaxHeaderBytes:    64 << 10,
-		}
-		go func() {
-			listener, err := tls.Listen("tcp", tlsAddr, config)
-			if err != nil {
-				errCh <- err
-				return
+			log.Printf("TLS disabled: cannot load certificate: %v", err)
+		} else {
+			tlsAddr := envOr("httpfin_tls_addr", ":8443")
+			log.Printf("httpfin inspector listening on https://%s (SNI + ALPN capture enabled)", tlsAddr)
+			tlsServer = &http.Server{
+				Addr:              tlsAddr,
+				Handler:           NewTLSHandler(mux, store, observer),
+				TLSConfig:         config,
+				ReadHeaderTimeout: 5 * time.Second,
+				ReadTimeout:       15 * time.Second,
+				WriteTimeout:      30 * time.Second,
+				IdleTimeout:       60 * time.Second,
+				MaxHeaderBytes:    64 << 10,
 			}
-			errCh <- server.Serve(listener)
-		}()
+			tlsListener, err = tls.Listen("tcp", tlsAddr, config)
+			if err != nil {
+				log.Printf("TLS listener failed: %v", err)
+				tlsServer = nil
+			} else {
+				go func() { errCh <- tlsServer.Serve(tlsListener) }()
+			}
+		}
 	} else {
 		log.Printf("TLS disabled: set httpfin_tls_cert and httpfin_tls_key to enable HTTPS/SNI capture")
 	}
-	log.Fatal(<-errCh)
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(signals)
+	select {
+	case err := <-errCh:
+		if err != nil && err != http.ErrServerClosed {
+			log.Printf("HTTP server stopped: %v", err)
+		}
+	case sig := <-signals:
+		log.Printf("received %s, shutting down", sig)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = plainServer.Shutdown(ctx)
+	if tlsServer != nil {
+		_ = tlsServer.Shutdown(ctx)
+	}
+	if tlsListener != nil {
+		_ = tlsListener.Close()
+	}
 }
 
 func envOr(name, fallback string) string {

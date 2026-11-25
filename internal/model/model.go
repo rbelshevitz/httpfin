@@ -36,21 +36,50 @@ type Connection struct {
 }
 
 type Store struct {
-	mu    sync.RWMutex
-	items []Connection
+	mu       sync.RWMutex
+	items    []Connection
+	next     int
+	count    int
+	capacity int
 }
 
-func NewStore(items []Connection) *Store { return &Store{items: items} }
+const defaultCapacity = 5000
+
+func NewStore(items []Connection) *Store {
+	s := &Store{capacity: defaultCapacity, items: make([]Connection, defaultCapacity)}
+	for i := len(items) - 1; i >= 0; i-- {
+		s.addLocked(items[i])
+	}
+	return s
+}
+
 func (s *Store) Add(c Connection) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.items = append([]Connection{c}, s.items...)
-	if len(s.items) > 5000 {
-		s.items = s.items[:5000]
+	s.addLocked(c)
+}
+
+func (s *Store) addLocked(c Connection) {
+	if s.capacity == 0 {
+		s.capacity = defaultCapacity
+		s.items = make([]Connection, s.capacity)
 	}
+	index := (s.next + s.count) % s.capacity
+	if s.count == s.capacity {
+		index = s.next
+		s.next = (s.next + 1) % s.capacity
+	} else {
+		s.count++
+	}
+	s.items[index] = c
 }
 func (s *Store) List() []Connection {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]Connection(nil), s.items...)
+	result := make([]Connection, s.count)
+	for i := 0; i < s.count; i++ {
+		index := (s.next + s.count - 1 - i) % s.capacity
+		result[i] = s.items[index]
+	}
+	return result
 }

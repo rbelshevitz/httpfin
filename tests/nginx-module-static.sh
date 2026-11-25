@@ -32,6 +32,8 @@ grep -Fq 'ngx_http_cycle_get_module_main_conf' "$source_file"
 grep -Fq 'ngx_http_httpfin_append' "$source_file"
 test "$(grep -Fc 'ngx_cpymem' "$source_file")" -eq 0
 grep -Fq 'goto oversize' "$source_file"
+grep -Fq 'ngx_http_httpfin_connect' "$source_file"
+grep -Fq 'dropped_error' "$source_file"
 grep -Fq 'ssl_protocol' "$source_file"
 grep -Fq 'ssl_server_name' "$source_file"
 grep -Fq 'ssl_alpn_protocol' "$source_file"

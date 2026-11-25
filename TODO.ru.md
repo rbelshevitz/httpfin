@@ -8,9 +8,8 @@
 
 - [ ] Собрать Nginx-модуль под закреплённый исходный код Nginx и пройти полный
   container smoke test.
-- [ ] Закрыть открытые пункты [`docs/SECURITY_AUDIT.ru.md`](docs/SECURITY_AUDIT.ru.md):
-  права Unix socket, reconnect, health ingest, bounded store, корректное
-  завершение и совместимость `ResponseWriter`.
+- [ ] Выполнить pinned Docker build и полный container smoke test на хосте с
+  доступным Docker daemon.
 - [ ] Добавить fuzz-тесты для C-сборщика JSON и Go-декодера событий.
 - [ ] Добавить нагрузочные тесты для TLS handshakes, HTTP/2 и Unix datagram.
 

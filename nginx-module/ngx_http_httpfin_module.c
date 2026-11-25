@@ -41,6 +41,8 @@ static char *ngx_http_httpfin_merge_loc_conf(ngx_conf_t *cf, void *parent,
     void *child);
 static ngx_int_t ngx_http_httpfin_init_process(ngx_cycle_t *cycle);
 static void ngx_http_httpfin_exit_process(ngx_cycle_t *cycle);
+static ngx_int_t ngx_http_httpfin_connect(ngx_http_httpfin_main_conf_t *mcf,
+    ngx_log_t *log);
 static ngx_int_t ngx_http_httpfin_request_init(ngx_http_request_t *r);
 static ngx_int_t ngx_http_httpfin_log(ngx_http_request_t *r);
 static ngx_int_t ngx_http_httpfin_var_request_id(ngx_http_request_t *r,
@@ -208,8 +210,6 @@ static ngx_int_t
 ngx_http_httpfin_init_process(ngx_cycle_t *cycle)
 {
     ngx_http_httpfin_main_conf_t *mcf;
-    int flags;
-    struct sockaddr_un address;
 
     mcf = ngx_http_cycle_get_module_main_conf(cycle,
                                               ngx_http_httpfin_module);
@@ -221,42 +221,59 @@ ngx_http_httpfin_init_process(ngx_cycle_t *cycle)
     if (!mcf->enabled || mcf->socket_path.len == 0) {
         return NGX_OK;
     }
-    if (mcf->socket_path.len >= sizeof(address.sun_path)) {
+    if (mcf->socket_path.len >= sizeof(struct sockaddr_un) -
+        offsetof(struct sockaddr_un, sun_path)) {
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
                       "httpfin_socket path is too long");
         return NGX_ERROR;
     }
 
+    (void) ngx_http_httpfin_connect(mcf, cycle->log);
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_http_httpfin_connect(ngx_http_httpfin_main_conf_t *mcf, ngx_log_t *log)
+{
+    int flags;
+    struct sockaddr_un address;
+
+    if (mcf == NULL || mcf->socket_path.len == 0 ||
+        mcf->socket_path.len >= sizeof(address.sun_path)) {
+        return NGX_ERROR;
+    }
+    if (ngx_http_httpfin_socket != -1) {
+        close(ngx_http_httpfin_socket);
+        ngx_http_httpfin_socket = -1;
+    }
     ngx_http_httpfin_socket = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (ngx_http_httpfin_socket == -1) {
-        ngx_log_error(NGX_LOG_WARN, cycle->log, ngx_errno,
+        ngx_log_error(NGX_LOG_WARN, log, ngx_errno,
                       "httpfin: socket() failed");
-        return NGX_OK;
+        return NGX_ERROR;
     }
     flags = fcntl(ngx_http_httpfin_socket, F_GETFL, 0);
     if (flags == -1 || fcntl(ngx_http_httpfin_socket, F_SETFL, flags | O_NONBLOCK) == -1) {
-        ngx_log_error(NGX_LOG_WARN, cycle->log, ngx_errno,
+        ngx_log_error(NGX_LOG_WARN, log, ngx_errno,
                       "httpfin: cannot set non-blocking socket");
         close(ngx_http_httpfin_socket);
         ngx_http_httpfin_socket = -1;
-        return NGX_OK;
+        return NGX_ERROR;
     }
-
     ngx_memzero(&address, sizeof(address));
     address.sun_family = AF_UNIX;
     ngx_memcpy(address.sun_path, mcf->socket_path.data, mcf->socket_path.len);
     if (connect(ngx_http_httpfin_socket, (struct sockaddr *) &address,
-                offsetof(struct sockaddr_un, sun_path) + mcf->socket_path.len + 1) == -1)
-    {
-        ngx_log_error(NGX_LOG_WARN, cycle->log, ngx_errno,
+                offsetof(struct sockaddr_un, sun_path) + mcf->socket_path.len + 1) == -1) {
+        ngx_log_error(NGX_LOG_WARN, log, ngx_errno,
                       "httpfin: connect(%V) failed; events will be dropped",
                       &mcf->socket_path);
         close(ngx_http_httpfin_socket);
         ngx_http_httpfin_socket = -1;
-    } else {
-        ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
-                      "httpfin: connected to %V", &mcf->socket_path);
+        return NGX_ERROR;
     }
+    ngx_log_error(NGX_LOG_NOTICE, log, 0,
+                  "httpfin: connected to %V", &mcf->socket_path);
     return NGX_OK;
 }
 
@@ -369,7 +386,8 @@ ngx_http_httpfin_emit(ngx_http_request_t *r, ngx_http_httpfin_ctx_t *ctx,
     ngx_str_t method, uri, host, ua, remote, tls_version, sni, alpn;
     ssize_t n;
 
-    if (ngx_http_httpfin_socket == -1) {
+    if (ngx_http_httpfin_socket == -1 &&
+        ngx_http_httpfin_connect(mcf, r->connection->log) != NGX_OK) {
         ngx_str_set(&ctx->handoff_status, "unavailable");
         return NGX_DECLINED;
     }
@@ -459,8 +477,9 @@ ngx_http_httpfin_emit(ngx_http_request_t *r, ngx_http_httpfin_ctx_t *ctx,
         ngx_str_set(&ctx->handoff_status, "dropped_backpressure");
     } else {
         ngx_str_set(&ctx->handoff_status, "dropped_error");
+        close(ngx_http_httpfin_socket);
+        ngx_http_httpfin_socket = -1;
     }
-    (void) mcf;
     return NGX_OK;
 
 oversize:

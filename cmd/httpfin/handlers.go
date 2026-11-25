@@ -25,7 +25,15 @@ func reportHandler(store *model.Store) http.HandlerFunc {
 		report.Write(w, store.List())
 	}
 }
-func healthHandler(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }
+func healthHandler(ingestHealthy func() bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		if ingestHealthy != nil && !ingestHealthy() {
+			http.Error(w, "ingest unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
 func writeJSON(w http.ResponseWriter, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(value)

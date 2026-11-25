@@ -18,7 +18,7 @@ import (
 func TestNginxUnixDatagramFormat(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "events.sock")
 	store := model.NewStore(nil)
-	stop, err := ingest.StartUnixDatagram(path, store)
+	stop, _, err := ingest.StartUnixDatagram(path, store)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
 			t.Skip("sandbox disallows Unix datagram sockets")
@@ -65,7 +65,7 @@ func TestNginxUnixDatagramFormat(t *testing.T) {
 func TestNginxUnixDatagramFormatIgnoresMalformedJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "events.sock")
 	store := model.NewStore(nil)
-	stop, err := ingest.StartUnixDatagram(path, store)
+	stop, _, err := ingest.StartUnixDatagram(path, store)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
 			t.Skip("sandbox disallows Unix datagram sockets")

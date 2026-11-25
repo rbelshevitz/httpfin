@@ -35,40 +35,46 @@ limits. Slow clients can hold goroutines and file descriptors for too long.
 
 Both listeners now set read, write, header, idle and maximum-header limits.
 
-### P1 — socket spoofing and event injection — open
+### P1 — socket spoofing and event injection — mitigated
 
-The Unix socket is changed to mode `0666`. Any local process that can reach the
-path can inject observations or flood the collector. Use a protected runtime
-directory, a dedicated group and mode `0660`; validate event version and field
-limits.
+The socket now uses mode `0660`, supports an explicit `httpfin_socket_group`,
+and rejects unknown event versions and oversized input fields. Keep the runtime
+directory accessible only to the Nginx worker group; any member of that group
+can still inject events by design.
 
-### P1 — no reconnect after collector restart — open
+### P1 — no reconnect after collector restart — fixed in working tree
 
-The Nginx worker connects its datagram socket once. Restarting Go creates a new
-socket, but existing Nginx workers do not reconnect automatically. Events are
-dropped until workers are reloaded or the module gains reconnect logic.
+The module retries the connection on a later request when the collector socket
+is unavailable and closes a failed connected socket so the next request can
+reconnect after a Go restart.
 
-### P2 — silent ingest failure — open
+### P2 — silent ingest failure — mitigated
 
-The Go datagram reader exits on a non-timeout read error while the HTTP service
-continues to report healthy. Add logging and an ingest health signal.
+The reader logs fatal read errors and `/healthz` returns `503` when the ingest
+loop has stopped. A deployment should still alert on health failures.
 
-### P2 — inefficient bounded store — open
+### P2 — inefficient bounded store — fixed in working tree
 
-The store is capped at 5000 records, but prepending each record copies the
-whole slice. A ring buffer would reduce allocation and GC pressure at high
-request rates. Field lengths should also be capped before storing user input.
+The store is now a fixed-capacity ring buffer. Datagram fields are bounded
+before they reach the store. Direct HTTP fields still follow the server header
+limit and should be redacted at the report boundary for sensitive deployments.
 
-### P2 — incomplete graceful shutdown — open
+### P2 — incomplete graceful shutdown — fixed in working tree
 
-`log.Fatal` exits immediately and bypasses deferred cleanup. Add signal-driven
-shutdown for HTTP servers, the TLS listener and the Unix socket.
+The process handles `SIGINT`/`SIGTERM`, drains HTTP and TLS servers with a
+deadline, closes the TLS listener and then stops the Unix socket reader.
 
-### P2 — response writer compatibility — open
+### P2 — Docker signal forwarding — fixed in working tree
 
-The logging wrappers do not preserve optional interfaces such as `Flusher` and
-`Hijacker`. This can affect streaming or protocol-upgrade handlers even though
-the current inspector UI and API do not require them.
+The image entrypoint keeps a small supervisor shell so termination reaches both
+Nginx and Go. The image pins the Nginx and Alpine versions used by the build
+and starts Nginx workers in the `nobody` group, matching the protected socket.
+
+### P2 — response writer compatibility — fixed in working tree
+
+The logging wrappers now preserve `Flusher`, `Hijacker` and `Unwrap` when the
+underlying writer supports them. The current inspector does not use upgrades,
+but the middleware no longer needlessly hides these capabilities.
 
 ## Checks performed
 

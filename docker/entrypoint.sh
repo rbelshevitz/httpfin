@@ -10,9 +10,18 @@ if [ ! -s /etc/nginx/certs/server.crt ] || [ ! -s /etc/nginx/certs/server.key ];
     -addext 'subjectAltName=DNS:inspector.example.test' >/dev/null 2>&1
 fi
 
-httpfin_socket=/run/httpfin/events.sock /usr/local/bin/httpfin &
+httpfin_socket=/run/httpfin/events.sock \
+httpfin_socket_group=nobody \
+/usr/local/bin/httpfin &
 httpfin_pid=$!
-trap 'kill "$httpfin_pid" 2>/dev/null || true' EXIT INT TERM
+nginx_pid=
+cleanup() {
+	kill "$httpfin_pid" 2>/dev/null || true
+	if [ -n "$nginx_pid" ]; then kill "$nginx_pid" 2>/dev/null || true; fi
+	wait "$httpfin_pid" 2>/dev/null || true
+	if [ -n "$nginx_pid" ]; then wait "$nginx_pid" 2>/dev/null || true; fi
+}
+trap cleanup EXIT INT TERM
 
 i=0
 while [ ! -S /run/httpfin/events.sock ] && [ "$i" -lt 50 ]; do
@@ -22,4 +31,6 @@ done
 
 test -S /run/httpfin/events.sock
 nginx -t
-exec /usr/sbin/nginx -g 'daemon off;'
+/usr/sbin/nginx -g 'daemon off;' &
+nginx_pid=$!
+wait "$nginx_pid"
