@@ -14,7 +14,8 @@ then produces a JSON API, UI and Squid-style report.
 
 It is an evidence tool, not an authentication system or an automatic blocker.
 `curl-impersonate` is used only as a reference traffic generator; its profiles
-can become outdated. The upstream project is maintained by [`lwthiker`](https://github.com/lwthiker).
+can become outdated. The upstream project is maintained under the GitHub account
+[`lwthiker`](https://github.com/lwthiker).
 
 ## Quick start
 
