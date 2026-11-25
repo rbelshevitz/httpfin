@@ -41,7 +41,7 @@ func TestStartUnixDatagram(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	payload, _ := json.Marshal(nginxEvent{RequestID: "test-event", RemoteAddr: "127.0.0.1", Method: "GET", URI: "/health", Status: 200})
+	payload, _ := json.Marshal(nginxEvent{Version: 1, RequestID: "test-event", RemoteAddr: "127.0.0.1", Method: "GET", URI: "/health", Status: 200})
 	if _, err := conn.Write(payload); err != nil {
 		t.Fatal(err)
 	}
