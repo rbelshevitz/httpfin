@@ -136,7 +136,7 @@ See [`nginx-module/README.md`](nginx-module/README.md) and
 
 - what User-Agent the client declared;
 - observed or negotiated TLS version, SNI and ALPN;
-- HTTP method, target, status, timing, bytes and source address;
+- HTTP method, target, status and source address;
 - heuristic profiles for desktop and mobile clients such as `Chrome-like`,
   `Chrome Android-like`, `Edge-like`, `Firefox-like`, `Samsung Internet-like`,
   `Android WebView-like`, or `Generic HTTP`;
@@ -151,16 +151,19 @@ User-Agent and fingerprints are client-controlled or imitable signals. An
 empty fingerprint means that the observation point did not have the required
 data; it is not a browser mismatch.
 
-## Which evidence is enough
+Timing and response size come from the direct Go mode or the Nginx access log.
+The current Nginx HTTP module does not include them in its `httpfin` event.
 
-| Goal | Current evidence is enough | Go deeper only when |
+## Which httpfin evidence is enough
+
+| Goal | What httpfin provides now | What needs additional observation |
 |---|---|---|
-| API QA and regression testing | method, URI, status, timing, bytes, User-Agent, protocol, TLS, SNI and ALPN | the test must compare the exact TLS handshake or HTTP/2 connection setup |
-| Nginx, proxy and ingress troubleshooting | source address, Host, SNI, ALPN, TLS version, status and access-log comparison | the original handshake must be compared before TLS termination |
-| Comparing browsers, SDKs and mobile clients | declared profile plus transport fields and a versioned baseline | a difference cannot be explained by the client version or network path |
-| Investigating ClientHello differences | direct Go TLS fields and the local signature are a first hint | standard JA3/JA4 or raw handshake fields are required |
-| Investigating HTTP/2 connection behavior | HTTP version and request result | SETTINGS, frame order or connection-level behavior matters |
-| Counting every request | the in-memory report is useful for a short diagnostic run | use the Nginx access log or future durable storage |
+| API QA and regression testing | method, URI, status, User-Agent, protocol, plus TLS, SNI and ALPN in TLS mode | access log for timing and bytes; a separate observer for the exact TLS handshake or HTTP/2 |
+| Nginx, proxy and ingress troubleshooting | source address, SNI, ALPN, TLS version and status; some fields must be checked against the access log | compare the original handshake before TLS termination |
+| Comparing browsers, SDKs and mobile clients | User-Agent profile, available transport fields, and baseline comparison | a separate observer when the difference cannot be explained by the client version or network path |
+| Investigating ClientHello differences | separate ClientHello fields and a local signature in direct Go TLS mode | standard JA3/JA4 or the complete raw handshake fields |
+| Investigating HTTP/2 connection behavior | negotiated HTTP version and request result | SETTINGS, frame order, and other connection-level signals |
+| Counting every request | a bounded in-memory report for a short diagnostic run | access logs or durable storage for complete accounting |
 
 The deeper levels are not automatically better. They add deployment complexity,
 certificate or packet-capture concerns, and more data to retain. They are only
