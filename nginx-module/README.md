@@ -17,6 +17,32 @@ When `httpfin on;` is enabled, the module:
 `dropped_error`, `unavailable`, `oversize`, or `not_sent`. Dropping is
 intentional: the NGINX request path never waits for the Go consumer.
 
+## When the module runs
+
+The module is part of the NGINX HTTP request lifecycle, not the TLS handshake:
+
+```text
+TLS handshake
+     │ Nginx terminates TLS or rejects it
+     ▼
+HTTP headers read
+     │ NGX_HTTP_POST_READ_PHASE: allocate request ID
+     ▼
+proxy or serve request
+     │
+     ▼
+final status available
+     │ NGX_HTTP_LOG_PHASE: emit one bounded datagram
+     ▼
+/run/httpfin/events.sock → Go collector
+```
+
+It does not see a raw ClientHello and does not run in the stream preread phase.
+The separate `ngx_stream_ssl_preread_module` can inspect SNI, offered ALPN and
+the advertised TLS version for passthrough routing, but it cannot see HTTP
+headers or status. The HTTP module reads Nginx variables after TLS termination
+and sends request-level telemetry after processing completes.
+
 ## Build
 
 ### Runtime libraries and OpenSSL

@@ -126,6 +126,11 @@ thin: it creates a request ID, collects bounded request/TLS fields and sends a
 non-blocking Unix datagram to Go. The Go process owns normalization, storage,
 classification, baselines, risk hints and reports.
 
+The module is engaged after Nginx has handled the TLS handshake: it initializes
+request context in `NGX_HTTP_POST_READ_PHASE` and emits one event in
+`NGX_HTTP_LOG_PHASE`, after the final request status is available. It is not a
+raw ClientHello parser and does not participate in `stream ssl_preread`.
+
 ```text
 client → Nginx / ingress → application
              │

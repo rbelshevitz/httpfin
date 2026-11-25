@@ -70,6 +70,20 @@ sequenceDiagram
     G-->>R: Squid-style TXT
 ```
 
+Native-модуль работает только внутри HTTP-жизненного цикла Nginx:
+
+1. Nginx сначала принимает или отклоняет TLS handshake. Только после этого
+   HTTP-модуль видит запрос; raw ClientHello он не разбирает.
+2. В `NGX_HTTP_POST_READ_PHASE`, после чтения headers, модуль создаёт request
+   ID и включает контекст запроса, если действует `httpfin on;`.
+3. Nginx штатно обслуживает запрос или проксирует его upstream.
+4. В `NGX_HTTP_LOG_PHASE`, когда известен финальный status, модуль копирует
+   ограниченный набор HTTP/TLS-полей и отправляет один Unix datagram в Go.
+
+Итак, модуль — это handoff на HTTP-слое от запроса к collector. Это не TLS
+preread-модуль, не proxy и не policy engine. Для passthrough SNI/ALPN используется
+отдельный `ngx_stream_ssl_preread_module` Nginx.
+
 Datagram — best-effort telemetry. Access log остаётся операционным резервом при
 недоступном сокете или backpressure.
 

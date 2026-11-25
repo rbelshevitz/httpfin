@@ -138,6 +138,12 @@ integration layer: снимает request/TLS-поля, создаёт request I
 отчёты и UI остаются в Go. Это разделение позволяет обновлять правила и
 формат отчёта без пересборки Nginx.
 
+Модуль включается после обработки TLS handshake самим Nginx: в
+`NGX_HTTP_POST_READ_PHASE` он создаёт контекст и request ID, а в
+`NGX_HTTP_LOG_PHASE`, после появления финального status, отправляет одно
+ограниченное событие в Go. Он не разбирает raw ClientHello и не участвует в
+`stream ssl_preread`.
+
 Для TLS без termination Nginx может использовать `ngx_stream_ssl_preread_module` и получить SNI/ALPN из ClientHello. Для точного JA3/JA4 нужен raw ClientHello или полноценный preread-парсер. После TLS termination нужно передать в Go хотя бы `$ssl_protocol`, `$ssl_alpn_protocol`, `$ssl_cipher`, `$ssl_server_name`, `$http_user_agent` и исходный IP.
 
 Отдельный preread-конфиг для SNI/ALPN находится в [`configs/nginx/httpfin-stream.conf`](configs/nginx/httpfin-stream.conf). Он не видит HTTP после TLS и потому используется для маршрутизации и stream-диагностики, а не для полного отчёта запроса.

@@ -70,6 +70,20 @@ sequenceDiagram
     G-->>R: Squid-style TXT artifact
 ```
 
+The native module is active only inside Nginx's HTTP request lifecycle:
+
+1. Nginx completes or rejects the TLS handshake before the HTTP module sees a
+   request. The module does not parse raw ClientHello.
+2. In `NGX_HTTP_POST_READ_PHASE`, after request headers are read, it allocates
+   the request ID and enables per-request context when `httpfin on;` applies.
+3. Nginx proxies or serves the request normally.
+4. In `NGX_HTTP_LOG_PHASE`, after the request has a final status, the module
+   copies bounded HTTP/TLS variables and sends one Unix datagram to Go.
+
+The module is therefore a request-to-collector handoff at the HTTP layer, not
+a TLS preread module, proxy, or policy engine. `ngx_stream_ssl_preread_module`
+is a separate Nginx stream module used for passthrough SNI/ALPN routing.
+
 The datagram is best-effort telemetry. Access logs remain the operational
 fallback when a collector socket is unavailable or under backpressure.
 
