@@ -51,7 +51,9 @@ static ngx_int_t ngx_http_httpfin_emit(ngx_http_request_t *r,
     ngx_http_httpfin_ctx_t *ctx, ngx_http_httpfin_main_conf_t *mcf);
 static void ngx_http_httpfin_get_variable(ngx_http_request_t *r,
     ngx_str_t *value, u_char *name, size_t name_len);
-static u_char *ngx_http_httpfin_json_string(u_char *p, u_char *last,
+static ngx_int_t ngx_http_httpfin_append(u_char **p, u_char *last,
+    u_char *value, size_t len);
+static ngx_int_t ngx_http_httpfin_json_string(u_char **p, u_char *last,
     ngx_str_t *value);
 
 static ngx_int_t ngx_http_httpfin_socket = -1;
@@ -363,6 +365,7 @@ ngx_http_httpfin_emit(ngx_http_request_t *r, ngx_http_httpfin_ctx_t *ctx,
     ngx_http_httpfin_main_conf_t *mcf)
 {
     u_char event[httpfin_max_event], *p, *last;
+    u_char status[NGX_INT_T_LEN], *status_end;
     ngx_str_t method, uri, host, ua, remote, tls_version, sni, alpn;
     ssize_t n;
 
@@ -393,38 +396,62 @@ ngx_http_httpfin_emit(ngx_http_request_t *r, ngx_http_httpfin_ctx_t *ctx,
                                   sizeof("ssl_alpn_protocol") - 1);
     p = event;
     last = event + sizeof(event);
-    p = ngx_cpymem(p, "{\"version\":1,\"request_id\":\"",
-                   sizeof("{\"version\":1,\"request_id\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &(ngx_str_t) {
-        ngx_strlen(ctx->request_id), ctx->request_id });
-    p = ngx_cpymem(p, "\",\"method\":\"", sizeof("\",\"method\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &method);
-    p = ngx_cpymem(p, "\",\"uri\":\"", sizeof("\",\"uri\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &uri);
-    p = ngx_cpymem(p, "\",\"host\":\"", sizeof("\",\"host\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &host);
-    p = ngx_cpymem(p, "\",\"user_agent\":\"",
-                   sizeof("\",\"user_agent\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &ua);
-    p = ngx_cpymem(p, "\",\"remote_addr\":\"",
-                   sizeof("\",\"remote_addr\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &remote);
-    p = ngx_cpymem(p, "\",\"status\":", sizeof("\",\"status\":") - 1);
-    p = ngx_sprintf(p, "%ui", (ngx_uint_t) r->headers_out.status);
-    p = ngx_cpymem(p, ",\"tls_version\":\"",
-                   sizeof(",\"tls_version\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &tls_version);
-    p = ngx_cpymem(p, "\",\"sni\":\"",
-                   sizeof("\",\"sni\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &sni);
-    p = ngx_cpymem(p, "\",\"alpn\":\"",
-                   sizeof("\",\"alpn\":\"") - 1);
-    p = ngx_http_httpfin_json_string(p, last, &alpn);
-    p = ngx_cpymem(p, "\"}\n", sizeof("\"}\n") - 1);
-    if (p >= last) {
-        ngx_str_set(&ctx->handoff_status, "oversize");
-        return NGX_DECLINED;
+
+#define HTTPFIN_APPEND_LITERAL(value)                                           \
+    if (ngx_http_httpfin_append(&p, last, (u_char *) (value),                  \
+                                sizeof(value) - 1) != NGX_OK)                   \
+    {                                                                            \
+        goto oversize;                                                          \
     }
+
+    HTTPFIN_APPEND_LITERAL("{\"version\":1,\"request_id\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &(ngx_str_t) {
+        ngx_strlen(ctx->request_id), ctx->request_id }) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"method\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &method) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"uri\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &uri) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"host\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &host) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"user_agent\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &ua) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"remote_addr\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &remote) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"status\":");
+    status_end = ngx_snprintf(status, sizeof(status), "%ui",
+                              (ngx_uint_t) r->headers_out.status);
+    if (ngx_http_httpfin_append(&p, last, status,
+                                (size_t) (status_end - status)) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL(",\"tls_version\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &tls_version) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"sni\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &sni) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"alpn\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &alpn) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\"}\n");
+
+#undef HTTPFIN_APPEND_LITERAL
+
     n = send(ngx_http_httpfin_socket, event, p - event, MSG_DONTWAIT | MSG_NOSIGNAL);
     if (n == (ssize_t) (p - event)) {
         ngx_str_set(&ctx->handoff_status, "sent");
@@ -434,6 +461,22 @@ ngx_http_httpfin_emit(ngx_http_request_t *r, ngx_http_httpfin_ctx_t *ctx,
         ngx_str_set(&ctx->handoff_status, "dropped_error");
     }
     (void) mcf;
+    return NGX_OK;
+
+oversize:
+#undef HTTPFIN_APPEND_LITERAL
+    ngx_str_set(&ctx->handoff_status, "oversize");
+    return NGX_DECLINED;
+}
+
+static ngx_int_t
+ngx_http_httpfin_append(u_char **p, u_char *last, u_char *value, size_t len)
+{
+    if (len > (size_t) (last - *p)) {
+        return NGX_ERROR;
+    }
+    ngx_memcpy(*p, value, len);
+    *p += len;
     return NGX_OK;
 }
 
@@ -456,30 +499,32 @@ ngx_http_httpfin_get_variable(ngx_http_request_t *r, ngx_str_t *value,
     value->len = variable->len;
 }
 
-static u_char *
-ngx_http_httpfin_json_string(u_char *p, u_char *last, ngx_str_t *value)
+static ngx_int_t
+ngx_http_httpfin_json_string(u_char **p, u_char *last, ngx_str_t *value)
 {
-    u_char *end;
+    u_char *data, *end;
     u_char c;
+    size_t needed;
 
-    if (p >= last) {
-        return last;
-    }
-    for (end = value->data + value->len; value->data < end && p + 2 < last;
-         value->data++)
-    {
-        c = *value->data;
+    data = value->data;
+    for (end = data + value->len; data < end; data++) {
+        c = *data;
+        needed = (c == '\\' || c == '"' || c == '\n' || c == '\r'
+                  || c == '\t' || c < 0x20) ? 2 : 1;
+        if (needed > (size_t) (last - *p)) {
+            return NGX_ERROR;
+        }
         if (c == '\\' || c == '"') {
-            *p++ = '\\';
+            *(*p)++ = '\\';
         }
         if (c == '\n' || c == '\r' || c == '\t') {
-            *p++ = '\\';
-            *p++ = (c == '\n') ? 'n' : (c == '\r' ? 'r' : 't');
+            *(*p)++ = '\\';
+            *(*p)++ = (c == '\n') ? 'n' : (c == '\r' ? 'r' : 't');
         } else if (c < 0x20) {
-            *p++ = '?';
+            *(*p)++ = '?';
         } else {
-            *p++ = c;
+            *(*p)++ = c;
         }
     }
-    return p;
+    return NGX_OK;
 }

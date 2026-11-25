@@ -11,9 +11,18 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
-type Hello struct{ ServerName, OfferedALPN, Signature string }
+const (
+	helloTTL        = time.Minute
+	maxPendingHello = 4096
+)
+
+type Hello struct {
+	ServerName, OfferedALPN, Signature string
+	SeenAt                             time.Time
+}
 type Observer struct {
 	mu       sync.Mutex
 	byRemote map[string]Hello
@@ -25,8 +34,20 @@ func (o *Observer) Observe(info *tls.ClientHelloInfo) {
 		return
 	}
 	signature := signature(info)
+	now := time.Now()
 	o.mu.Lock()
-	o.byRemote[info.Conn.RemoteAddr().String()] = Hello{ServerName: info.ServerName, OfferedALPN: strings.Join(info.SupportedProtos, ","), Signature: signature}
+	for key, hello := range o.byRemote {
+		if now.Sub(hello.SeenAt) > helloTTL {
+			delete(o.byRemote, key)
+		}
+	}
+	if len(o.byRemote) >= maxPendingHello {
+		for key := range o.byRemote {
+			delete(o.byRemote, key)
+			break
+		}
+	}
+	o.byRemote[info.Conn.RemoteAddr().String()] = Hello{ServerName: info.ServerName, OfferedALPN: strings.Join(info.SupportedProtos, ","), Signature: signature, SeenAt: now}
 	o.mu.Unlock()
 }
 func (o *Observer) Take(remote string) Hello {
@@ -37,6 +58,9 @@ func (o *Observer) Take(remote string) Hello {
 	return h
 }
 func Config(certFile, keyFile string, observer *Observer) (*tls.Config, error) {
+	if observer == nil {
+		observer = NewObserver()
+	}
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		return nil, err

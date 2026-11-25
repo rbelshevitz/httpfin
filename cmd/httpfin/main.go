@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"httpfin/internal/demo"
 	"httpfin/internal/ingest"
@@ -28,7 +29,16 @@ func main() {
 	addr := envOr("httpfin_addr", ":8080")
 	log.Printf("httpfin inspector listening on http://%s", addr)
 	errCh := make(chan error, 2)
-	go func() { errCh <- http.ListenAndServe(addr, requestLogger(mux, store)) }()
+	plainServer := &http.Server{
+		Addr:              addr,
+		Handler:           requestLogger(mux, store),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    64 << 10,
+	}
+	go func() { errCh <- plainServer.ListenAndServe() }()
 	if cert, key, ok := tlsinspect.EnvTLSConfigured(); ok {
 		observer := tlsinspect.NewObserver()
 		config, err := tlsinspect.Config(cert, key, observer)
@@ -37,7 +47,16 @@ func main() {
 		}
 		tlsAddr := envOr("httpfin_tls_addr", ":8443")
 		log.Printf("httpfin inspector listening on https://%s (SNI + ALPN capture enabled)", tlsAddr)
-		server := &http.Server{Addr: tlsAddr, Handler: NewTLSHandler(mux, store, observer), TLSConfig: config}
+		server := &http.Server{
+			Addr:              tlsAddr,
+			Handler:           NewTLSHandler(mux, store, observer),
+			TLSConfig:         config,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       15 * time.Second,
+			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			MaxHeaderBytes:    64 << 10,
+		}
 		go func() {
 			listener, err := tls.Listen("tcp", tlsAddr, config)
 			if err != nil {

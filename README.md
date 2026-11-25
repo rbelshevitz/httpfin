@@ -255,6 +255,7 @@ SIEM, browser telemetry, or an authentication system.
 See [`docs/USE_CASES_TEAM.md`](docs/USE_CASES_TEAM.md) for team-oriented
 runbooks, [`docs/USE_CASES.md`](docs/USE_CASES.md) for practical examples, and
 [`docs/DEVOPS_RUNBOOK.md`](docs/DEVOPS_RUNBOOK.md) for rollout diagnostics.
+The anti-bot gatekeeper roadmap is in [`TODO.md`](TODO.md).
 
 ## References
 

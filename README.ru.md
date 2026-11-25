@@ -218,6 +218,7 @@ DevOps/SRE, API QA, backend-разработчика и security-команды.
 
 Подробные сценарии для DevOps/SRE, API-тестировщиков, backend и security находятся в [`docs/USE_CASES_TEAM.ru.md`](docs/USE_CASES_TEAM.ru.md). Режимы TLS, сертификаты и сборка модуля вне Docker описаны в [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md) и [`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md). Интерфейс Swagger/OpenAPI — [`docs/openapi.yaml`](docs/openapi.yaml).
 Схемы режимов наблюдения и потоков данных находятся в [`docs/ARCHITECTURE.ru.md`](docs/ARCHITECTURE.ru.md).
+План развития anti-bot-привратника находится в [`TODO.ru.md`](TODO.ru.md).
 
 Пример расширенного Nginx-лога:
 
