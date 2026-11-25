@@ -65,6 +65,16 @@ from such handshake data. Capturing them requires a TLS-aware listener at the
 termination point. The current Nginx HTTP module is not such a listener; a
 future direct-Go mode may add this with a suitable library.
 
+ClientHello is not an HTTP request and does not contain the server response or
+the user's data. It is sent once for each new TLS connection. Its contents vary
+between TLS 1.2 and TLS 1.3 and between browsers, mobile browsers, SDKs and
+command-line clients. The visible fields can include SNI, an ALPN list such as
+`h2` and `http/1.1`, cipher suites, extensions, supported groups and signature
+algorithms. SNI or ALPN may be absent, TLS resumption may add PSK/session data,
+and Encrypted ClientHello (ECH) may hide the real SNI and inner handshake.
+Therefore a ClientHello fingerprint is a diagnostic comparison value, not a
+stable identity.
+
 Reports are generated on request and are not written to a server-side report
 directory. The redirected file is created by the shell running `curl`.
 
