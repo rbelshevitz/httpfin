@@ -17,6 +17,17 @@ not block requests. `curl-impersonate` is used only to generate reference
 traffic; that project is maintained under the
 [`lwthiker`](https://github.com/lwthiker) account.
 
+## Why this tool is useful
+
+When an API behaves unexpectedly, a normal test shows only the status and
+response body. `httpfin` shows what reached the entry point: which client sent
+the request, its declared User-Agent, the resulting profile, visible TLS
+signals, and what changed from the previous request.
+
+This helps separate an API problem from a browser, SDK, proxy, TLS, or Nginx
+change. The result can be saved as a readable report for QA, developers, or
+DevOps.
+
 ## Quick start
 
 ```bash
