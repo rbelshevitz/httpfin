@@ -19,13 +19,17 @@ and anti-bot signals are supporting evidence, never the sole blocking input.
 
 ## Near-term operations work
 
-- [ ] Test the host/systemd Fail2ban path with a controlled security event:
-  verify that no jail means no ban, and that an explicitly enabled jail can ban
-  and unban. This does not mean fingerprint-based blocking is implemented.
-- [ ] Define loss accounting and collector health once the metrics format is
-  agreed.
-- [ ] Cover the remaining reliability cases: permissions, overflow, and slow
-  consumers.
+- [ ] **Host Fail2ban:** on a dedicated test address verify four states: a log
+  without a jail does not ban, the filter rejects `observe`, an enabled jail
+  bans only `deny`, and `unban` removes the ban. Cover IPv4, IPv6, trusted proxy,
+  and allowlist behavior.
+- [ ] **Loss accounting:** agree on the minimum states `received → decoded →
+  stored → dropped`, expose them through health/diagnostic output, and document
+  reconciliation with the access log. Missing telemetry must not be treated as
+  proof that no request occurred.
+- [ ] **Reliability:** add reproducible cases for socket permission failures,
+  datagram overflow, and a slow Go consumer. Nginx must continue serving in all
+  three cases, with the loss reason visible to operators.
 
 ## Long-term architecture
 
