@@ -17,17 +17,41 @@ policy in separate, explicit stages.
 Anti-bot policy remains downstream of these diagnostic capabilities. It must not
 become the primary purpose of the project.
 
+## Delivery order and dependencies
+
+The first release target is diagnostic transparency, not automated blocking:
+
+1. **Observation quality:** wire observer, versioned observation schema and
+   endpoint-specific baselines.
+2. **Reliability:** bounded decoding, fuzzing, load tests, loss counters and
+   optional persistence.
+3. **Operator experience:** explainable reports, Prometheus metrics, health
+   signals and replay/diff tooling.
+4. **Policy integrations:** shadow mode first; challenge, throttling and
+   Fail2ban remain external, explicit and fail-open by default.
+
+Do not implement report explanations, browser mismatch decisions or policy
+actions before every signal has an observation source and a state of
+`declared`, `negotiated`, `inferred`, `unknown` or `unavailable`.
+
 ## Before expanding detection
 
 - [x] Build the Nginx module against the pinned Nginx source and run the full
   container smoke test.
 - [ ] Add fuzz tests for the C JSON builder and Go event decoder.
 - [ ] Add load tests for TLS handshakes, HTTP/2 requests and Unix datagrams.
+- [ ] Add fuzz tests for malformed, truncated and oversized ClientHello,
+  HTTP/2 frames, JSON events and report fields; assert bounded memory and no
+  panic in the Go decoder or C module.
+- [ ] Add loss-injection tests for full Unix datagram buffers, slow consumers,
+  Go restarts and socket permission failures.
 
 ## Anti-bot observation layer
 
-- [ ] Define a versioned observation schema for declared, negotiated and
-  inferred fields.
+- [ ] Define a versioned observation schema with separate namespaces for
+  `declared`, `negotiated`, `inferred`, `unknown` and `unavailable` fields.
+  Include source, observation point, parser version, capture time and
+  connection/request IDs.
 - [x] Add a first baseline-file loader for Go-terminated TLS; keep unknown
   signatures explicit and never convert a baseline mismatch directly into a
   ban.
@@ -37,7 +61,12 @@ become the primary purpose of the project.
   signal.
 - [ ] Add privacy controls: field allowlist, redaction, retention period and
   access audit.
-- [ ] Add endpoint-specific baselines instead of one global browser profile.
+- [ ] Add endpoint-specific baselines instead of one global browser profile;
+  define matching precedence for method, normalized route, host, API version
+  and client/partner identity.
+- [ ] Make baseline comparison explainable: show the expected field, observed
+  field, comparison rule, baseline version and whether the result is drift,
+  missing evidence or a real mismatch.
 
 ## Policy layer: API gatekeeper
 
@@ -141,9 +170,29 @@ and [Nginx-specific Fail2ban examples](https://fail2ban.dev/guides/nginx/).
 
 ## Operator experience
 
-- [ ] Add a report section that explains each decision reason in plain language.
+- [ ] Add a report section that explains each discrepancy in plain language,
+  for example: “User-Agent declares Chrome, but the observed transport
+  summary is generic; this is a signal, not proof of automation.”
+- [ ] Show the observation point and evidence state beside every important
+  value; never render an absent value as a negative match.
+- [ ] Add report exports in JSON, Squid-style text, Markdown and HTML.
+- [ ] Add report comparison by request/connection ID and a `differences-only`
+  mode for client, Nginx, OpenSSL and SDK regression checks.
 - [ ] Add OpenAPI endpoints for observations, baselines, policy previews and
   decision traces.
-- [ ] Add metrics for event loss, observer availability, policy latency and
-  action counts.
+- [ ] Add Prometheus metrics for received, decoded, persisted, dropped,
+  backpressure, parse failures, incomplete observations, observer availability,
+  report latency and policy action counts.
+- [ ] Add health checks for ingest lag and loss rate, with documented alert
+  thresholds and a separate readiness state for optional persistence.
 - [ ] Add a canary rollout guide and an emergency bypass procedure.
+
+## Storage and retention
+
+- [ ] Keep the bounded in-memory ring buffer as the default low-dependency mode.
+- [ ] Add optional durable export with a small first backend (SQLite or JSONL);
+  preserve the same versioned event schema and make write failures visible.
+- [ ] Define retention, redaction, rotation, disk-full behavior and recovery
+  procedures before enabling durable storage by default.
+- [ ] Keep ClickHouse, remote queues and distributed storage as adapters after
+  the local persistence path and loss accounting are proven.

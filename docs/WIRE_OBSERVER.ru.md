@@ -20,7 +20,8 @@ JA3/JA4 или HTTP/2 fingerprint по данным своего hook.
 ## TLS
 
 TLS 1.3 допускает произвольный порядок расширений ClientHello, кроме отдельных
-ограничений самого протокола. Для fingerprint нужны исходные списки cipher и
+ограничений самого протокола (например, `pre_shared_key` должен быть последним).
+Для fingerprint нужны исходные списки cipher и
 extensions, GREASE policy, supported groups, point formats, signature
 algorithms, ALPN, состояние SNI и предложенные версии TLS. Parsed summary полезна
 как evidence, но не равна исходному wire-сообщению.
@@ -32,7 +33,8 @@ parser либо в отдельном observer.
 
 TLS 1.3 resumption, HelloRetryRequest, ECH и отсутствие SNI должны получать
 явный статус `unknown` или отдельный observation state. Их нельзя автоматически
-считать mismatch браузера.
+считать mismatch браузера. GREASE нужно обрабатывать по правилам выбранного
+алгоритма; само наличие GREASE не является признаком не-браузера.
 
 ## JA3 и JA4
 
@@ -81,6 +83,9 @@ path не получит fixtures и измеряемые loss counters.
 ## Источники
 
 - [RFC 8446: TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446.html)
+- [RFC 6066: TLS extensions, включая Server Name Indication](https://www.rfc-editor.org/rfc/rfc6066.html)
+- [RFC 8701: GREASE](https://www.rfc-editor.org/rfc/rfc8701.html)
+- [RFC 9849: TLS Encrypted Client Hello](https://www.rfc-editor.org/rfc/rfc9849.html)
 - [Go `crypto/tls.ClientHelloInfo`](https://pkg.go.dev/crypto/tls#ClientHelloInfo)
 - [RFC 9113: HTTP/2](https://www.rfc-editor.org/rfc/rfc9113.html)
 - [Nginx stream SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html)

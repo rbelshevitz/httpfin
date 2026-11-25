@@ -20,11 +20,11 @@ or HTTP/2 fingerprints from that hook.
 ## TLS details
 
 TLS 1.3 allows ClientHello extensions in any order except where the protocol
-specification imposes a specific rule. A fingerprint implementation therefore
-needs the original cipher and extension lists, GREASE handling, supported
-groups, point formats, signature algorithms, ALPN, SNI state, and the offered
-TLS versions. A parsed summary is useful evidence but is not automatically the
-original wire message.
+specification imposes a specific rule (for example, `pre_shared_key` is last).
+A fingerprint implementation therefore needs the original cipher and extension
+lists, GREASE handling, supported groups, point formats, signature algorithms,
+ALPN, SNI state, and the offered TLS versions. A parsed summary is useful
+evidence but is not automatically the original wire message.
 
 Go's `tls.ClientHelloInfo` exposes useful parsed fields such as cipher suites,
 curves, signature schemes, ALPN, supported versions, and extension IDs. Its
@@ -34,7 +34,9 @@ a separate observer.
 
 TLS 1.3 resumption, HelloRetryRequest, ECH, and missing SNI must produce
 explicit `unknown` or separate observation states. They must not be forced into
-a browser mismatch.
+a browser mismatch. GREASE values must be recognized and handled according to
+the selected fingerprint algorithm; they are not evidence of a non-browser
+client by themselves.
 
 ## JA3 and JA4
 
@@ -85,6 +87,9 @@ TLS path has fixtures and measurable loss counters.
 ## Sources
 
 - [RFC 8446: TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446.html)
+- [RFC 6066: TLS extensions, including Server Name Indication](https://www.rfc-editor.org/rfc/rfc6066.html)
+- [RFC 8701: GREASE](https://www.rfc-editor.org/rfc/rfc8701.html)
+- [RFC 9849: TLS Encrypted Client Hello](https://www.rfc-editor.org/rfc/rfc9849.html)
 - [Go `crypto/tls.ClientHelloInfo`](https://pkg.go.dev/crypto/tls#ClientHelloInfo)
 - [RFC 9113: HTTP/2](https://www.rfc-editor.org/rfc/rfc9113.html)
 - [Nginx stream SSL preread module](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html)

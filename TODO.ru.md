@@ -18,17 +18,41 @@
 Anti-bot policy остаётся потребителем этих диагностических данных, а не главной
 целью проекта.
 
+## Порядок поставки и зависимости
+
+Первая цель — прозрачная диагностика, а не автоматическая блокировка:
+
+1. **Качество наблюдения:** wire observer, версионируемая схема и baseline,
+   привязанный к endpoint.
+2. **Надёжность:** ограниченный decoder, fuzz-тесты, нагрузочные тесты,
+   счётчики потерь и опциональное хранение.
+3. **Работа оператора:** объяснимые отчёты, Prometheus-метрики, health-сигналы,
+   replay и diff.
+4. **Policy-интеграции:** сначала shadow mode; challenge, throttling и
+   Fail2ban остаются внешними, явными и по умолчанию fail-open.
+
+Нельзя строить объяснения отчёта, mismatch браузера или policy-действия, пока
+для каждого признака не указаны источник наблюдения и состояние: `declared`,
+`negotiated`, `inferred`, `unknown` или `unavailable`.
+
 ## Сначала — надёжность
 
 - [x] Собрать Nginx-модуль под закреплённый исходный код Nginx и пройти полный
   container smoke test.
 - [ ] Добавить fuzz-тесты для C-сборщика JSON и Go-декодера событий.
 - [ ] Добавить нагрузочные тесты для TLS handshakes, HTTP/2 и Unix datagram.
+- [ ] Добавить fuzz-тесты для malformed, truncated и oversized ClientHello,
+  HTTP/2 frames, JSON events и полей отчёта; проверить ограничение памяти и
+  отсутствие panic в Go decoder и C-модуле.
+- [ ] Добавить тесты потерь при переполнении Unix datagram buffer, медленном
+  consumer, рестарте Go и ошибках прав на socket.
 
 ## Слой наблюдения anti-bot
 
-- [ ] Определить версионируемый формат наблюдения: заявленные, согласованные и
-  вычисленные поля хранить отдельно.
+- [ ] Определить версионируемый формат наблюдения: отдельно хранить
+  `declared`, `negotiated`, `inferred`, `unknown` и `unavailable`. Добавить
+  source, observation point, parser version, capture time и connection/request
+  IDs.
 - [x] Добавить первый loader baseline-файла для TLS termination в Go; явно
   хранить неизвестные signatures и не превращать mismatch напрямую в ban.
 - [ ] Добавить точку интеграции с wire-observer для raw ClientHello, JA3/JA4 и
@@ -38,7 +62,11 @@ Anti-bot policy остаётся потребителем этих диагно�
 - [ ] Добавить privacy controls: allowlist полей, redaction, срок хранения и
   аудит доступа.
 - [ ] Делать baseline отдельным для endpoint, а не одним глобальным профилем
-  браузера.
+  браузера; определить порядок выбора по method, normalized route, host, API
+  version и client/partner identity.
+- [ ] Объяснять сравнение baseline: ожидаемое поле, наблюдаемое поле, правило
+  сравнения, версия baseline и отличие drift от отсутствия данных или
+  настоящего mismatch.
 
 ## Policy-слой: API-привратник
 
@@ -144,9 +172,31 @@ journal, а не парсить `/api/report` и JSON наблюдений. `htt
 
 ## Работа оператора
 
-- [ ] Добавить в отчёт объяснение каждой причины простым языком.
+- [ ] Добавить в отчёт объяснение каждого расхождения простым языком,
+  например: «User-Agent заявляет Chrome, но наблюдаемая transport summary
+  выглядит обобщённо; это сигнал, а не доказательство automation».
+- [ ] Показывать observation point и evidence state рядом с каждым важным
+  значением; отсутствие данных не отображать как отрицательный match.
+- [ ] Добавить экспорт отчёта в JSON, Squid-style text, Markdown и HTML.
+- [ ] Добавить сравнение отчётов по request/connection ID и режим
+  `differences-only` для регрессий клиента, Nginx, OpenSSL и SDK.
 - [ ] Добавить OpenAPI endpoints для наблюдений, baseline, preview policy и
   decision trace.
-- [ ] Добавить метрики потери событий, доступности observer, задержки policy и
-  количества действий.
+- [ ] Добавить Prometheus-метрики для received, decoded, persisted, dropped,
+  backpressure, parse failures, incomplete observations, доступности observer,
+  задержки отчёта и количества policy-действий.
+- [ ] Добавить health-проверки ingest lag и loss rate с описанными порогами
+  алертов; отдельно показывать readiness опционального storage.
 - [ ] Добавить руководство по canary rollout и аварийный bypass.
+
+## Хранение и retention
+
+- [ ] Оставить bounded in-memory ring buffer режимом по умолчанию без новых
+  зависимостей.
+- [ ] Добавить первый опциональный durable backend — SQLite или JSONL — с той
+  же версионируемой схемой событий и видимыми ошибками записи.
+- [ ] До включения durable storage по умолчанию описать retention, redaction,
+  rotation, заполнение диска и recovery.
+- [ ] ClickHouse, удалённые очереди и распределённое storage оставить
+  адаптерами следующего этапа, после проверки локального хранения и счётчиков
+  потерь.
