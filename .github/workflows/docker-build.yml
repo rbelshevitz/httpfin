@@ -20,4 +20,15 @@ jobs:
         run: docker build --pull=false -t httpfin:manual-check .
 
       - name: Check Nginx configuration
-        run: docker run --rm httpfin:manual-check nginx -t
+        run: |
+          docker run --rm --entrypoint sh httpfin:manual-check -c '
+            set -eu
+            mkdir -p /etc/nginx/certs
+            openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+              -keyout /etc/nginx/certs/server.key \
+              -out /etc/nginx/certs/server.crt \
+              -subj "/CN=inspector.example.test" \
+              -addext "subjectAltName=DNS:inspector.example.test" \
+              >/dev/null 2>&1
+            nginx -t
+          '
