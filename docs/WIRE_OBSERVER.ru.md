@@ -17,6 +17,48 @@
 Текущий Nginx-модуль остаётся request-level адаптером. Он не должен объявлять
 JA3/JA4 или HTTP/2 fingerprint по данным своего hook.
 
+## Схема записи наблюдения
+
+Каждый признак должен храниться вместе с происхождением, а не как
+непрозрачная строка. Первая версия схемы должна быть явной и совместимой с
+будущим расширением:
+
+```json
+{
+  "schema_version": "observation.v1",
+  "connection_id": "tls-01H...",
+  "request_id": "req-01H...",
+  "signal": {
+    "name": "tls.ja4",
+    "value": "t13d1516h2_...",
+    "state": "inferred",
+    "source": "go-wire-observer",
+    "observation_point": "before_tls_server",
+    "parser_version": "clienthello/1",
+    "algorithm_version": "ja4-tls/1",
+    "captured_at": "2026-11-25T18:00:00Z"
+  }
+}
+```
+
+Состояния признаков нужно использовать единообразно:
+
+- `declared`: заявлено клиентом, например User-Agent или offered ALPN;
+- `negotiated`: выбрано протоколом, например TLS version или ALPN;
+- `inferred`: выведено httpfin из одного или нескольких наблюдений;
+- `unknown`: признак ожидался, но данных недостаточно или они неоднозначны;
+- `unavailable`: данная точка наблюдения не может получить поле.
+
+`source` обозначает producer, `observation_point` — место, где были видны
+байты, а версии parser/algorithm делают последующие сравнения
+воспроизводимыми. Пустое значение нельзя трактовать как mismatch. Ошибка
+parser должна быть `unknown` с ограниченным error code, а не выдуманным
+fingerprint.
+
+Connection и request identity нужно хранить раздельно. Одно TLS-соединение
+может обслуживать много HTTP/2 requests, а request может прийти без записи
+wire observer. Нельзя связывать записи только по source IP и времени.
+
 ## TLS
 
 TLS 1.3 допускает произвольный порядок расширений ClientHello, кроме отдельных
@@ -65,6 +107,40 @@ access-log не может надёжно приписать initial SETTINGS к
 
 Оборванное или malformed-соединение нужно хранить как incomplete evidence, а не
 тихо считать mismatch браузера.
+
+## Bounded tee и правила связи
+
+Direct-TLS capture должен быть пассивным bounded tee, а не вторым reader TLS:
+
+1. принять raw connection и назначить `connection_id` до запуска TLS parser;
+2. копировать каждый байт, который читает `tls.Server`, в буфер фиксированного
+   размера до достижения лимита;
+3. всегда возвращать полный результат чтения TLS parser, включая байты, которые
+   после достижения лимита уже не сохраняются;
+4. отдельно записывать `captured_bytes`, `capture_limit`, `truncated`,
+   `read_error` и `handshake_result`;
+5. при ошибке capture или parser продолжать обычный TLS path, если это возможно,
+   и помечать evidence как incomplete;
+6. не читать `ClientHelloInfo.Conn` из callback и не создавать неограниченную
+   goroutine или queue для capture.
+
+Лимит должен настраиваться, но оставаться жёстко ограниченным. Его значение по
+умолчанию должно покрывать обычный ClientHello, а чрезмерно большой handshake
+может занимать только предусмотренный буфер. Лимит capture ограничивает
+сохранённые evidence, но не размер TLS-сообщения: TLS всё равно должен получить
+исходные байты.
+
+Правила связи:
+
+- `connection_id` создаётся в первой точке наблюдения и не меняется в течение
+  TCP/TLS-соединения;
+- HTTP/2 evidence связывается с request через `connection_id` и `stream_id`;
+- Nginx event использует свой `request_id`; raw TLS можно связать только при
+  наличии доверенного connection или handoff ID;
+- proxy hops получают отдельные записи и не объединяются только из-за
+  совпадения адреса источника;
+- при отсутствии ID создаются отдельные записи с
+  `join_state=unavailable`, без догадок о связи.
 
 ## Рекомендуемый порядок работ
 

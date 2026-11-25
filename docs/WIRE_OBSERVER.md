@@ -17,6 +17,48 @@ request-level hook can reconstruct connection-level fingerprints.
 The current Nginx module stays in the fourth column. It must not claim JA3/JA4
 or HTTP/2 fingerprints from that hook.
 
+## Observation record schema
+
+Every signal should carry its provenance instead of being stored as an
+unqualified string. The first version of the schema should be explicit and
+forward-compatible:
+
+```json
+{
+  "schema_version": "observation.v1",
+  "connection_id": "tls-01H...",
+  "request_id": "req-01H...",
+  "signal": {
+    "name": "tls.ja4",
+    "value": "t13d1516h2_...",
+    "state": "inferred",
+    "source": "go-wire-observer",
+    "observation_point": "before_tls_server",
+    "parser_version": "clienthello/1",
+    "algorithm_version": "ja4-tls/1",
+    "captured_at": "2026-11-25T18:00:00Z"
+  }
+}
+```
+
+Use these signal states consistently:
+
+- `declared`: supplied by the client, such as User-Agent or offered ALPN;
+- `negotiated`: selected by the protocol, such as TLS version or ALPN;
+- `inferred`: derived by httpfin from one or more observations;
+- `unknown`: the observation was expected but insufficient or ambiguous;
+- `unavailable`: this deployment point cannot observe the field.
+
+`source` identifies the producer, `observation_point` identifies where it saw
+the bytes, and parser/algorithm versions make later comparisons reproducible.
+An empty value must not be interpreted as a mismatch. A parser failure should
+be represented as `unknown` with a bounded error code, not as a fabricated
+fingerprint.
+
+The schema must preserve connection and request identity separately. One TLS
+connection can carry many HTTP/2 requests; a request can also arrive without a
+wire observer record. Joining by source IP and timestamp alone is forbidden.
+
 ## TLS details
 
 TLS 1.3 allows ClientHello extensions in any order except where the protocol
@@ -69,6 +111,40 @@ The first HTTP/2 evidence record should preserve:
 
 Malformed or incomplete connections must be retained as incomplete evidence,
 not silently classified as a browser mismatch.
+
+## Bounded tee and join semantics
+
+The direct-TLS capture path is a passive bounded tee, not a second TLS reader:
+
+1. accept the raw connection and assign `connection_id` before TLS parsing;
+2. copy each byte read by `tls.Server` into a fixed-size capture buffer until
+   the limit is reached;
+3. always return the complete read result to the TLS parser, including bytes
+   that are no longer retained after the limit;
+4. record `captured_bytes`, `capture_limit`, `truncated`, `read_error` and
+   `handshake_result` separately;
+5. if capture or parsing fails, continue the normal TLS path when possible and
+   mark the evidence incomplete;
+6. never read `ClientHelloInfo.Conn` from the callback and never start an
+   unbounded goroutine or queue for capture.
+
+The limit must be configurable but hard-bounded. The default should be large
+enough for ordinary ClientHello messages while a maliciously large handshake
+can only consume the configured buffer. A capture limit is an evidence limit,
+not a TLS message limit: TLS must still receive the original bytes.
+
+Join rules:
+
+- `connection_id` is created at the earliest observer and is stable for the
+  lifetime of that TCP/TLS connection;
+- HTTP/2 connection evidence joins to requests through `connection_id` and
+  `stream_id`;
+- Nginx request events use their `request_id`; a raw TLS record may be joined
+  only when the deployment supplies a trusted connection or handoff ID;
+- proxy hops receive distinct observation records and are never merged merely
+  because the source address matches;
+- missing IDs produce separate records with `join_state=unavailable`, not a
+  guessed association.
 
 ## Recommended implementation order
 
