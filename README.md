@@ -134,6 +134,23 @@ User-Agent and fingerprints are client-controlled or imitable signals. An
 empty fingerprint means that the observation point did not have the required
 data; it is not a browser mismatch.
 
+## Which evidence is enough
+
+| Goal | Current evidence is enough | Go deeper only when |
+|---|---|---|
+| API QA and regression testing | method, URI, status, timing, bytes, User-Agent, protocol, TLS, SNI and ALPN | the test must compare the exact TLS handshake or HTTP/2 connection setup |
+| Nginx, proxy and ingress troubleshooting | source address, Host, SNI, ALPN, TLS version, status and access-log comparison | the original handshake must be compared before TLS termination |
+| Comparing browsers, SDKs and mobile clients | declared profile plus transport fields and a versioned baseline | a difference cannot be explained by the client version or network path |
+| Investigating ClientHello differences | direct Go TLS fields and the local signature are a first hint | standard JA3/JA4 or raw handshake fields are required |
+| Investigating HTTP/2 connection behavior | HTTP version and request result | SETTINGS, frame order or connection-level behavior matters |
+| Counting every request | the in-memory report is useful for a short diagnostic run | use the Nginx access log or future durable storage |
+
+The deeper levels are not automatically better. They add deployment complexity,
+certificate or packet-capture concerns, and more data to retain. They are only
+justified when the current report cannot answer a specific operational question.
+None of these fields alone is enough to identify a person or authorize or block
+a client.
+
 ## Typical uses
 
 - compare curl, SDKs, browsers and `curl-impersonate`;
