@@ -17,20 +17,21 @@ and anti-bot signals are supporting evidence, never the sole blocking input.
 - [x] Integration, fuzz, restart, and race-detector coverage.
 - [x] Operations and non-technical QA documentation.
 
-## Remaining for the current runtime
+## Near-term operations work
 
-- [ ] Complete the optional ban path: add a separately reviewed `deny` rule and
-  an end-to-end Fail2ban test. Keep observe-only as the default.
+- [ ] Test the host/systemd Fail2ban path with a controlled security event:
+  verify that no jail means no ban, and that an explicitly enabled jail can ban
+  and unban. This does not mean fingerprint-based blocking is implemented.
 - [ ] Define loss accounting and collector health once the metrics format is
   agreed.
 - [ ] Cover the remaining reliability cases: permissions, overflow, and slow
   consumers.
 
-## Deferred
+## Long-term architecture
 
 - Optional SQLite history for search across restarts; never enable by default.
-- A separate wire observer for raw ClientHello, real JA3/JA4, and HTTP/2
-  connection evidence.
+- Fingerprint-based blocking requires a separate TLS-aware edge proxy, wire
+  observer, or direct Go TLS proxy. The current Nginx HTTP module is not enough.
 - Automatic profile updates and distributed storage.
 
 ## Constraints
