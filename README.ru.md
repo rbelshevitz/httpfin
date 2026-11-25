@@ -19,6 +19,18 @@ go run ./cmd/httpfin
 # открыть http://127.0.0.1:8080
 ```
 
+В другом терминале отправьте запрос и получите данные:
+
+```bash
+curl -v http://127.0.0.1:8080/healthz
+curl -fsS http://127.0.0.1:8080/api/connections
+curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
+```
+
+Этот HTTP-режим не требует сертификата и подходит для отладки методов API,
+headers, status и timing. UI открывается по адресу
+`http://127.0.0.1:8080/`.
+
 Эндпоинты:
 
 - `GET /api/connections` — последние наблюдения в JSON;
@@ -47,6 +59,50 @@ httpfin_socket=/run/httpfin/events.sock go run ./cmd/httpfin
 ```
 
 Модуль отправляет один JSON event на запрос; отсутствие сокета не должно блокировать Nginx worker. Go принимает события, добавляет их в общее хранилище и отчёты.
+
+### Тестовый Docker-образ с Nginx и native-модулем
+
+Соберите и запустите полный стек:
+
+```bash
+docker compose up --build
+```
+
+Проверьте TLS, SNI и HTTP/2:
+
+```bash
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  --http2 https://inspector.example.test:8443/healthz
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/api/connections
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/api/report > httpfin-report.txt
+```
+
+`--resolve` делает TLS SNI совпадающим с тестовым сертификатом и направляет
+запрос на localhost. `-k` нужен только из-за короткоживущего self-signed
+сертификата, который создаёт тестовый entrypoint.
+
+Если установлен `curl-impersonate`, сравните wrapper-профили:
+
+```bash
+curl_chrome116 --http2 https://inspector.example.test:8443/healthz
+curl_ff117 --http2 https://inspector.example.test:8443/healthz
+```
+
+Имена wrapper-ов и версии браузеров зависят от upstream-релиза. Используйте
+их как тестовые fixtures, а не как постоянную истину о браузерах.
+
+Проверка интеграции:
+
+```bash
+go test ./...
+go vet ./...
+./tests/nginx-module-static.sh
+./tests/container-smoke.sh
+```
+
+Последняя проверка требует доступного Docker daemon.
 
 ## Архитектурный подход
 
@@ -107,27 +163,27 @@ HTTP-клиента, а `JA4+` — название расширенного с�
 `httpfin` их не считает, но может показать значения, переданные внешним
 wire-observer.
 
-## ⚡ Цели проекта
+## Цели проекта
 
 `httpfin` нужен, чтобы быстро ответить на вопрос: «какой клиент реально
 пришёл на этот endpoint и что изменилось по дороге?». Проект решает такие
 практические задачи:
 
-- ⚡ отладка API-клиента: сравнить curl, SDK, Go/Java/Python-клиент,
+- отладка API-клиента: сравнить curl, SDK, Go/Java/Python-клиент,
   браузер и `curl-impersonate`;
-- ⚡ проверка ingress и reverse proxy: не потерялись ли IP, SNI, ALPN,
+- проверка ingress и reverse proxy: не потерялись ли IP, SNI, ALPN,
   HTTP-версия, User-Agent и время запроса;
-- ⚡ контроль TLS: какой протокол согласован, какой SNI выбран, какой ALPN
+- контроль TLS: какой протокол согласован, какой SNI выбран, какой ALPN
   получил сервер и где именно завершается TLS;
-- ⚡ поиск расхождений: заявлен Chrome, а набор сетевых признаков похож на
+- поиск расхождений: заявлен Chrome, а набор сетевых признаков похож на
   generic HTTP-клиент;
-- ⚡ регрессионные проверки: изменился ли профиль после обновления Nginx,
+- регрессионные проверки: изменился ли профиль после обновления Nginx,
   OpenSSL, браузера, SDK или прокси;
-- ⚡ диагностика отправок: сравнить прямой запрос, запрос через proxy,
+- диагностика отправок: сравнить прямой запрос, запрос через proxy,
   ingress, CDN или service mesh;
-- ⚡ incident triage: связать время, IP, endpoint, статус, User-Agent и
+- incident triage: связать время, IP, endpoint, статус, User-Agent и
   доступные fingerprint-сигналы в одной временной шкале;
-- ⚡ подготовка данных для security-анализа и anti-bot правил без принятия
+- подготовка данных для security-анализа и anti-bot правил без принятия
   автоматического решения о блокировке внутри `httpfin`.
 
 Результат — наблюдаемая техническая картина запроса и понятный отчёт для

@@ -19,6 +19,17 @@ outdated as browsers and TLS stacks change.
 go run ./cmd/httpfin
 ```
 
+Open `http://127.0.0.1:8080/` for the local inspector UI. In another terminal:
+
+```bash
+curl -v http://127.0.0.1:8080/healthz
+curl -fsS http://127.0.0.1:8080/api/connections
+curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
+```
+
+This direct HTTP mode needs no certificate and is the simplest way to debug
+API methods, headers, status and timing.
+
 Endpoints:
 
 - `GET /api/connections` — recent observations as JSON;
@@ -32,6 +43,42 @@ docker compose up --build
 curl -k --resolve inspector.example.test:8443:127.0.0.1 \
   https://inspector.example.test:8443/healthz
 ```
+
+Test the complete TLS/SNI/HTTP2 path and save its output:
+
+```bash
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  --http2 https://inspector.example.test:8443/healthz
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/api/connections
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/api/report > httpfin-report.txt
+```
+
+`--resolve` makes the TLS SNI name match the test certificate and routes the
+request to localhost. `-k` is needed only because the example entrypoint
+creates a short-lived self-signed certificate.
+
+If `curl-impersonate` is installed, compare available wrapper profiles:
+
+```bash
+curl_chrome116 --http2 https://inspector.example.test:8443/healthz
+curl_ff117 --http2 https://inspector.example.test:8443/healthz
+```
+
+Wrapper names and supported browser versions depend on the upstream release.
+Treat them as test fixtures, not permanent browser truth.
+
+Run the integration checks:
+
+```bash
+go test ./...
+go vet ./...
+./tests/nginx-module-static.sh
+./tests/container-smoke.sh
+```
+
+The last check requires a working Docker daemon.
 
 The image is a diagnostic example. Its entrypoint creates a short-lived
 self-signed certificate only when no certificate is mounted. Production
@@ -130,25 +177,25 @@ to an incident, rollout or API test result. A blank fingerprint field means
 that the observation point did not receive the required wire data; it must not
 be silently interpreted as a mismatch.
 
-## ⚡ Project goals
+## Project goals
 
 `httpfin` answers a practical question: “what client actually reached this
 endpoint, and what changed on the way?” It is designed to help teams:
 
-- ⚡ debug API clients by comparing curl, SDKs, Go/Java/Python clients,
+- debug API clients by comparing curl, SDKs, Go/Java/Python clients,
   browsers, and `curl-impersonate`;
-- ⚡ verify that an ingress or reverse proxy preserves source IP, SNI, ALPN,
+- verify that an ingress or reverse proxy preserves source IP, SNI, ALPN,
   HTTP version, User-Agent, and timing;
-- ⚡ inspect TLS termination and confirm the negotiated protocol and server name;
-- ⚡ find inconsistencies such as a declared Chrome User-Agent with generic
+- inspect TLS termination and confirm the negotiated protocol and server name;
+- find inconsistencies such as a declared Chrome User-Agent with generic
   client-like network signals;
-- ⚡ detect regressions after upgrading Nginx, OpenSSL, browsers, SDKs, or
+- detect regressions after upgrading Nginx, OpenSSL, browsers, SDKs, or
   proxies;
-- ⚡ compare direct traffic with traffic sent through a proxy, CDN, ingress, or
+- compare direct traffic with traffic sent through a proxy, CDN, ingress, or
   service mesh;
-- ⚡ build a readable incident timeline from client, endpoint, status, and
+- build a readable incident timeline from client, endpoint, status, and
   available fingerprint signals;
-- ⚡ provide evidence for security and anti-bot analysis without making an
+- provide evidence for security and anti-bot analysis without making an
   automatic blocking decision inside `httpfin`.
 
 `httpfin` provides an observable technical picture and a useful report for
