@@ -28,6 +28,10 @@ curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
 
 Open <http://127.0.0.1:8080/> for the inspector UI.
 
+In production the collector binds to `127.0.0.1:8080` by default and starts
+with an empty store. Synthetic demo observations are opt-in with
+`httpfin_demo=1`.
+
 Available endpoints:
 
 - `/api/connections` — recent observations as JSON;
@@ -50,7 +54,9 @@ curl -k --resolve inspector.example.test:8443:127.0.0.1 \
 
 The example entrypoint creates a short-lived self-signed certificate. In
 production, mount the real certificate and key into Nginx as read-only secrets.
-The Go collector does not need the private key when Nginx terminates TLS.
+The Go collector does not need the private key when Nginx terminates TLS. This
+Compose mode is for observation and smoke tests; Fail2ban and host firewall
+access are deliberately outside it.
 
 ## How the Nginx integration works
 
@@ -79,7 +85,9 @@ See [`nginx-module/README.md`](nginx-module/README.md) and
 - what User-Agent the client declared;
 - observed or negotiated TLS version, SNI and ALPN;
 - HTTP method, target, status, timing, bytes and source address;
-- heuristic profiles such as `Chrome-like` or `Generic HTTP`;
+- heuristic profiles for desktop and mobile clients such as `Chrome-like`,
+  `Chrome Android-like`, `Edge-like`, `Firefox-like`, `Samsung Internet-like`,
+  `Android WebView-like`, or `Generic HTTP`;
 - JA3/JA4 and HTTP/2 values only when supplied by a suitable wire observer.
 
 User-Agent and fingerprints are client-controlled or imitable signals. An

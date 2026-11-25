@@ -156,6 +156,12 @@ request, so a restarted Go collector can recover without an Nginx reload. The
 stream remains best-effort telemetry; correlate it with NGINX access logs when
 lossless audit records are required.
 
+For production, keep the collector API on loopback (the Go default), keep the
+Unix socket in a private runtime directory, and expose the API only through an
+authenticated/admin path. The NGINX examples leave trusted proxy CIDRs as
+placeholders; replace them with the actual ingress ranges before enabling
+`real_ip`.
+
 ## Compatibility caveats
 
 - Dynamic modules are ABI-sensitive. Build with the same NGINX version and

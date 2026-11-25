@@ -1,4 +1,6 @@
 [httpfin-bot]
+# Disabled by default. A filter match does not ban until this jail is enabled
+# and its firewall action is deliberately selected in host configuration.
 enabled = false
 filter = httpfin-bot-deny
 logpath = /var/log/httpfin/security.log
@@ -7,4 +9,5 @@ maxretry = 3
 findtime = 10m
 bantime = 10m
 port = http,https
-banaction = nftables-multiport
+banaction = nftables[type=multiport]
+action = %(action_)s

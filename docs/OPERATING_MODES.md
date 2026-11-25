@@ -55,6 +55,19 @@ version or HTTP method, URL, headers, status, or User-Agent.
 is therefore a client offer, not proof of the version eventually negotiated by
 the downstream service.
 
+## Observation storage
+
+The default runtime keeps a bounded number of recent observations in memory and
+relies on the access log for detailed request history. This keeps the collector
+simple and bounded without making reports depend on a database or disk state.
+
+Runtime observations are lost on restart. Save `/api/report` and retain access
+logs before restarting when an incident needs to be investigated.
+
+SQLite is not required or enabled by default. It is reserved for a future
+durable-history mode that must define retention, redaction, cleanup, disk-full
+behavior, and recovery before it is considered production-ready.
+
 ## Practical team workflows
 
 - DevOps/SRE: compare direct and ingress requests after changes to TLS,

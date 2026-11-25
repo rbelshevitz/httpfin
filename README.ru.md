@@ -12,9 +12,12 @@
 собирает доступные в точке наблюдения данные HTTP, TLS/SNI/ALPN и User-Agent,
 а затем предоставляет JSON API, UI и отчёт в стиле Squid.
 
-Это инструмент наблюдения, а не система аутентификации и не автоматический
-блокировщик. `curl-impersonate` используется только как генератор эталонного
-трафика; его профили могут устаревать. Проект публикуется и сопровождается под
+Это инструмент наблюдения перед API: он собирает признаки клиента, строит
+отчёт и рассчитан на последующее подключение внешнего контура WAF, policy-
+сервиса или Fail2ban. Заготовка Fail2ban есть, но полная цепочка блокировки для
+Nginx-сценария пока не завершена. Сам по себе `httpfin` не является системой
+аутентификации и в штатном режиме не блокирует запросы. `curl-impersonate` используется только как
+генератор эталонного трафика; его профили могут устаревать. Проект публикуется и сопровождается под
 GitHub-аккаунтом [`lwthiker`](https://github.com/lwthiker).
 
 ## Быстрый запуск
@@ -27,6 +30,10 @@ curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
 ```
 
 UI: <http://127.0.0.1:8080/>.
+
+В production collector по умолчанию слушает только `127.0.0.1:8080` и не
+добавляет синтетические записи. Демонстрационные данные включаются только
+явно: `httpfin_demo=1`.
 
 Основные endpoints:
 
@@ -52,7 +59,12 @@ curl -k --resolve inspector.example.test:8443:127.0.0.1 \
 Тестовый entrypoint создаёт короткоживущий self-signed сертификат. В production
 настоящие сертификат и ключ нужно монтировать в Nginx как секреты только для
 чтения. Если TLS завершается в Nginx, сборщику Go не нужен доступ к закрытому
-ключу.
+ключу. Этот Compose-режим предназначен для наблюдения и smoke-тестов; Fail2ban
+и доступ к firewall хоста в него не входят.
+
+Для host/systemd-режима с отдельным security-log и Fail2ban см. заготовки
+[`deploy/systemd/httpfin.service`](deploy/systemd/httpfin.service) и
+[`docs/DEVOPS_RUNBOOK.ru.md`](docs/DEVOPS_RUNBOOK.ru.md).
 
 ## Как работает интеграция с Nginx
 
@@ -82,7 +94,9 @@ connection-level HTTP/2 SETTINGS. Для этих сигналов нужен di
 - User-Agent, заявленный клиентом;
 - наблюдаемую или согласованную версию TLS, SNI и ALPN;
 - HTTP method, target, status, timing, bytes и исходный IP-адрес;
-- эвристические профили вроде `Chrome-like` и `Generic HTTP`;
+- эвристические профили desktop и mobile-клиентов: `Chrome-like`,
+  `Chrome Android-like`, `Edge-like`, `Firefox-like`, `Samsung Internet-like`,
+  `Android WebView-like` и `Generic HTTP`;
 - JA3/JA4 и HTTP/2 только при наличии подходящего wire-observer.
 
 User-Agent и fingerprint — управляемые клиентом или имитируемые признаки.
@@ -102,6 +116,7 @@ mismatch браузера.
 
 - [`docs/USE_CASES_TEAM.ru.md`](docs/USE_CASES_TEAM.ru.md)
 - [`docs/DEVOPS_RUNBOOK.ru.md`](docs/DEVOPS_RUNBOOK.ru.md)
+- [`docs/NONTECHNICAL.ru.md`](docs/NONTECHNICAL.ru.md) — инструкция для сотрудников и API-тестировщиков
 - [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md)
 - [`docs/WIRE_OBSERVER.ru.md`](docs/WIRE_OBSERVER.ru.md)
 - [`docs/FAIL2BAN.ru.md`](docs/FAIL2BAN.ru.md)

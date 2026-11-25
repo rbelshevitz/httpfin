@@ -1,9 +1,11 @@
 # Fail2ban integration
 
-This guide shows how to connect `httpfin` to Fail2ban on a Linux host. The
-integration is opt-in. `httpfin` writes security events; Fail2ban reads them
-and may apply a temporary firewall ban. `httpfin` never runs firewall commands
-from an Nginx request worker.
+This guide describes a separate host-level mode. Fail2ban is not part of Docker
+Compose and must not run inside the `httpfin` container. The container mode is
+for observation and smoke tests; the host mode runs Nginx/`httpfin`, the
+security log and Fail2ban against the host firewall. The integration is opt-in:
+`httpfin` writes security events, Fail2ban reads them and may apply a temporary
+ban. `httpfin` never runs firewall commands from an Nginx request worker.
 
 ## What is implemented now
 
@@ -13,6 +15,12 @@ from an Nginx request worker.
 - only `decision=deny` is accepted by the anti-bot filter;
 - `observe`, `review`, and `challenge` never trigger that filter;
 - User-Agent, JA3/JA4, or a browser label alone never creates a ban.
+
+A `failregex` match does not block anything by itself. A real ban requires a
+security-log event, a matching filter, an enabled jail (`enabled = true`), a
+selected firewall action, and permission for Fail2ban to modify the firewall.
+`fail2ban-regex` only checks matches and never changes the firewall. The example
+jail is intentionally disabled, so installing the files does not enable bans.
 
 The current anti-bot policy is observe-only. A real `decision=deny` requires
 reviewed wire-level baselines and endpoint-specific rules. Do not enable the
@@ -36,7 +44,7 @@ Nginx / Go TLS observer
 /var/log/httpfin/security.log
   ↓  failregex
 Fail2ban jail
-  ↓  nftables-multiport or another local action
+  ↓  nftables[type=multiport] or another local action
 temporary IP ban
 ```
 
@@ -119,10 +127,31 @@ maxretry = 3
 findtime = 10m
 bantime = 10m
 port = http,https
-banaction = nftables-multiport
+banaction = nftables[type=multiport]
 ```
 
-Start with `enabled = false` and inspect matches. Then use a short ban:
+Start with `enabled = false` and inspect matches. Only after checking trusted
+proxy settings, allowlists, and a test `deny`, enable the jail in a separate
+`.local` file:
+
+```ini
+[httpfin-bot]
+enabled = true
+filter = httpfin-bot-deny
+logpath = /var/log/httpfin/security.log
+banaction = nftables[type=multiport]
+action = %(action_)s
+maxretry = 3
+findtime = 10m
+bantime = 10m
+ignoreip = 127.0.0.1/8 ::1
+```
+
+Older Ubuntu packages may use the legacy name `nftables-multiport`. If the
+modern action is unavailable, inspect available actions with
+`fail2ban-client -d` and use the name provided by the installed Fail2ban version.
+
+Then use a short ban:
 
 ```bash
 sudo fail2ban-client reload
@@ -138,8 +167,8 @@ sudo fail2ban-client set httpfin-bot unbanip 198.51.100.23
 ```
 
 The action name and firewall prerequisites vary by distribution. Confirm that
-`nftables-multiport` exists and inspect generated rules before enabling a
-production jail.
+the selected action (`nftables[type=multiport]` or a compatible legacy name)
+exists and inspect generated rules before enabling a production jail.
 
 ## Reverse proxy: do not ban the proxy
 
@@ -157,19 +186,18 @@ Never trust an arbitrary forwarding header from the client. Keep the original
 edge address separately for diagnostics. Validate this with a request from an
 untrusted network before enabling bans.
 
-## Docker
+## Docker boundary
 
-The container smoke setup writes `/run/httpfin/security.log` inside the
-container. A host Fail2ban process cannot read that path after the container
-is removed. For a real deployment choose one explicit transport:
+The Compose smoke setup writes its runtime files inside the container. Do not
+add Fail2ban to that Compose project or grant the container access to the host
+firewall.
 
-- bind-mount a host directory containing `security.log`;
-- forward structured security events to journald;
-- ship container logs to a host log collector and point Fail2ban at the
-  resulting file.
-
-Do not point host Fail2ban at an arbitrary Docker JSON log without testing log
-rotation, timestamps, permissions, and the exact line format.
+If the application must stay containerized, exposing the security log to a host
+Fail2ban process through a bind mount or a verified host log collector is a
+separate deployment mode. Do not point host Fail2ban at an arbitrary Docker JSON
+log without testing rotation, timestamps, permissions, and the exact line
+format. A native host deployment of Nginx and `httpfin` is the preferred
+Fail2ban setup.
 
 ## Troubleshooting
 

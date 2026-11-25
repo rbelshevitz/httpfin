@@ -36,6 +36,13 @@ type nginxEvent struct {
 // Datagram writes are intentionally one-way: an unavailable collector must
 // not stall an Nginx request worker.
 func StartUnixDatagram(path string, store *model.Store) (func(), func() bool, error) {
+	return StartUnixDatagramWithHandler(path, store, nil)
+}
+
+// StartUnixDatagramWithHandler passes normalized Nginx events through the
+// collector pipeline before they are stored. A nil handler keeps store-only
+// behavior for small integrations and tests.
+func StartUnixDatagramWithHandler(path string, store *model.Store, handler func(model.Connection)) (func(), func() bool, error) {
 	if path == "" {
 		return func() {}, func() bool { return true }, nil
 	}
@@ -97,11 +104,15 @@ func StartUnixDatagram(path string, store *model.Store) (func(), func() bool, er
 			if !validEvent(wire) {
 				continue
 			}
-			event := model.Connection{ID: wire.RequestID, Timestamp: time.Now().UTC(), ClientIP: wire.RemoteAddr, Method: wire.Method, URL: wire.URI, Status: wire.Status, UserAgent: wire.UserAgent, TLSVersion: wire.TLSVersion, SNI: wire.SNI, ALPN: wire.ALPN, DetectedProfile: "Unknown", UAConsistency: "Unknown", Risk: "Info", Protocol: "HTTP"}
+			event := model.Connection{ID: wire.RequestID, Timestamp: time.Now().UTC(), ClientIP: wire.RemoteAddr, Method: wire.Method, URL: wire.URI, Status: wire.Status, UserAgent: wire.UserAgent, TLSVersion: wire.TLSVersion, SNI: wire.SNI, ALPN: wire.ALPN, ObservationPoint: "nginx-http-module", DetectedProfile: "Unknown", UAConsistency: "Unknown", Risk: "Info", Protocol: "HTTP"}
 			if event.ID == "" {
 				event.ID = fmt.Sprintf("nginx-%d", n)
 			}
-			store.Add(event)
+			if handler != nil {
+				handler(event)
+			} else {
+				store.Add(event)
+			}
 		}
 	}()
 	return func() { close(stop); _ = conn.Close(); _ = os.Remove(path) }, healthy.Load, nil

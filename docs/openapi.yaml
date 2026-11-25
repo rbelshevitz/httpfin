@@ -1,3 +1,4 @@
+---
 openapi: 3.1.0
 info:
   title: httpfin Inspector API
@@ -41,7 +42,16 @@ components:
   schemas:
     Connection:
       type: object
-      required: [id, timestamp, client_ip, method, url, status, protocol, detected_profile, risk]
+      required:
+        - id
+        - timestamp
+        - client_ip
+        - method
+        - url
+        - status
+        - protocol
+        - detected_profile
+        - risk
       properties:
         id: {type: string}
         timestamp: {type: string, format: date-time}
@@ -53,6 +63,11 @@ components:
         bytes: {type: integer, format: int64}
         user_agent: {type: string}
         protocol: {type: string}
+        observation_point:
+          type: string
+          description: >-
+            Where the request was observed, for example nginx-http-module or
+            go-tls.
         tls_version: {type: string}
         alpn: {type: string}
         alpn_offered: {type: string}
@@ -67,4 +82,4 @@ components:
         reference_profile: {type: string}
         reference_version: {type: string}
         reference_source: {type: string}
-        baseline_status: {type: string, enum: [matched, drifted, unknown]}
+        baseline_status: {type: string, enum: [matched, mismatch, unknown]}

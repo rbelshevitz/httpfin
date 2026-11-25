@@ -66,7 +66,7 @@ curl_safari15_5 --compressed -v https://inspector.example.test/fixture
 
 После обновления Nginx, OpenSSL, HTTP/2 proxy или `curl-impersonate` сравнить экспорт `/api/report`. Изменение fingerprint не всегда означает поломку, но его нужно зафиксировать как изменение сетевого поведения.
 
-Важно: baseline привязывается к версии. Храним `profile`, `browser_version`, `curl_impersonate_version`, `checked_at`, `source` и `status`. Новый Chrome или новый wrapper может законно изменить JA3/JA4, поэтому сравнение должно показывать `drifted`, а не автоматически объявлять клиента подозрительным.
+Важно: baseline привязывается к версии. Храним `profile`, `browser_version`, `curl_impersonate_version`, `checked_at`, `source` и `status`. Новый Chrome или новый wrapper может законно изменить JA3/JA4, поэтому сравнение должно показывать `mismatch`/`unknown`, а не автоматически объявлять клиента подозрительным.
 
 ## 5. Nginx reverse proxy и потеря данных
 

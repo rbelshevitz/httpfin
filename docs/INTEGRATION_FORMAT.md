@@ -5,12 +5,13 @@
 ```text
 Client → Nginx → application
            ├─ TLS termination, SNI/ALPN, proxying, access log
-           └─ native module → Unix datagram → Go httpfin
+           └─ native module → Unix datagram → Go httpfin → optional security log
 ```
 
 Nginx handles data-plane work: TLS, virtual-host selection, ALPN, proxying and
 access logging. The module creates a request ID and sends a bounded,
-non-blocking event. Go normalizes, stores, classifies and reports it.
+non-blocking event. Go normalizes, profiles, applies baseline/policy, stores and
+reports it, and may write the host security log for an external Fail2ban setup.
 
 The event is best-effort telemetry. The module must not wait for Go, perform
 DNS/HTTP/database work, or calculate expensive fingerprints inside an Nginx
@@ -35,9 +36,10 @@ Nginx worker
        └─ bounded Unix datagram
             └─ httpfin Go executable
                  ├─ in-memory store
-                 ├─ profile/risk/baseline processing
+                 ├─ profile/risk/baseline/policy processing
                  ├─ /api/connections and /api/report
-                 └─ inspector UI
+                 ├─ inspector UI
+                 └─ optional host security log → Fail2ban
 ```
 
 The `.so` alone has no report storage, UI, API or durable queue. If the Go
@@ -97,8 +99,13 @@ Get the Squid-style text report for an incident, rollout or API-test artifact:
 curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
 ```
 
-The text report contains an access summary followed by fingerprint details.
-Use JSON in CI and dashboards; attach TXT to a ticket or test result. Empty
+The text report contains an access summary, a client-level summary with the
+observe-only bot signal, and per-observation fingerprint details. Each row
+shows the observation point and evidence state, plus changes from the previous
+observation for the same client IP; missing evidence is rendered as `unknown`,
+not as a mismatch. Sensitive query parameters are redacted at the report
+boundary. Use JSON in CI and dashboards; attach TXT to a ticket or test result.
+Empty
 JA3/JA4/HTTP/2 fields mean that the required wire observation was unavailable.
 
 Reports are generated synchronously from the current in-memory store when

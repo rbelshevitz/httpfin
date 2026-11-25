@@ -36,6 +36,42 @@ curl -k --resolve inspector.example.test:8443:127.0.0.1 \
   https://inspector.example.test:8443/api/report
 ```
 
+Docker-режим выше предназначен для наблюдения и smoke-тестов. Для production
+с Fail2ban используйте отдельный host/systemd-режим: Nginx и `httpfin` работают
+как службы хоста, security-log хранится на хосте, а Fail2ban управляет его
+firewall.
+
+Готовые заготовки:
+
+- [`deploy/systemd/httpfin.service`](../deploy/systemd/httpfin.service);
+- [`deploy/systemd/httpfin.env.example`](../deploy/systemd/httpfin.env.example).
+
+Минимальная установка на Ubuntu:
+
+```bash
+sudo useradd --system --home /var/lib/httpfin --shell /usr/sbin/nologin httpfin
+sudo install -d -o httpfin -g httpfin -m 0750 /etc/httpfin
+sudo install -m 0640 -o root -g httpfin \
+  deploy/systemd/httpfin.env.example /etc/httpfin/httpfin.env
+sudo install -D -m 0644 deploy/systemd/httpfin.service \
+  /etc/systemd/system/httpfin.service
+```
+
+Пользователь Nginx должен иметь доступ к Unix-сокету. Добавьте пользователя
+воркера (`nginx` или `www-data`) в группу `httpfin`, затем перезапустите Nginx:
+
+```bash
+sudo usermod -aG httpfin nginx
+sudo systemctl daemon-reload
+sudo systemctl enable --now httpfin
+sudo systemctl restart nginx
+```
+
+Если в системе используется `www-data`, замените имя пользователя в команде.
+Перед включением Fail2ban сначала проверьте `/healthz`, `/api/connections`,
+права на `/run/httpfin/events.sock` и появление строк в
+`/var/log/httpfin/security.log`.
+
 ## Что проверять после деплоя
 
 ### 1. TLS и SNI
@@ -55,7 +91,8 @@ openssl s_client \
 В Nginx access log есть диагностическая переменная `handoff`. В той же строке
 она может остаться `not_sent`, потому что встроенный log-модуль Nginx вычисляет
 переменные раньше обработчика handoff. Факт доставки проверяйте по появлению
-события в `/api/connections` и по счётчикам/ошибкам Go-приёмника.
+события в `/api/connections` и по ошибкам Go-приёмника в журнале. Отдельных
+счётчиков потерь в текущем runtime нет.
 
 Значения:
 
@@ -113,3 +150,9 @@ CIDR должен содержать только доверенные proxy hop
 3. Хранить отчёты короткое время и маскировать секреты из URL/query.
 4. Обновлять Nginx и native module одной версионной парой.
 5. Использовать fingerprint как диагностический сигнал, а не единственную блокирующую политику.
+
+Аварийный bypass: выставить `httpfin off;` в затронутом `server` или
+`location`, выполнить `nginx -t` и reload Nginx. Это убирает handoff модуля из
+request path, сохраняя proxy и access log. Go collector можно оставить
+запущенным до выяснения причины. Возвращать `httpfin on;` следует сначала на
+canary и повторить сравнение событий с access log.

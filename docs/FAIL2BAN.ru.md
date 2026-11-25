@@ -1,6 +1,13 @@
 # Интеграция с Fail2ban
 
-Эта инструкция показывает, как подключить `httpfin` к Fail2ban на Linux-хосте.
+Эта инструкция показывает отдельный host-level режим для Linux-хоста. Fail2ban
+не является частью Docker Compose и не должен запускаться внутри контейнера
+`httpfin`.
+
+В Docker-режиме запускаются Nginx и Go-наблюдатель. В режиме блокировки на хосте
+запускаются Nginx/`httpfin`, security-log и Fail2ban, причём Fail2ban работает
+с журналом и firewall самого хоста.
+
 Интеграция включается явно: `httpfin` пишет security-события, Fail2ban читает
 их и при необходимости временно блокирует IP через firewall. `httpfin` не
 запускает firewall-команды из Nginx worker.
@@ -13,6 +20,13 @@
 - anti-bot filter принимает только `decision=deny`;
 - `observe`, `review` и `challenge` не вызывают блокировку;
 - один User-Agent, JA3/JA4 или browser profile не создаёт ban.
+
+Совпадение `failregex` само по себе ничего не блокирует. Для реального бана
+одновременно нужны: запись в security-log, совпадение фильтра, включённый jail
+(`enabled = true`), выбранный firewall-action и права Fail2ban на изменение
+firewall. `fail2ban-regex` только проверяет совпадения и firewall не меняет.
+Пример jail в репозитории намеренно выключен, поэтому установка файлов не
+включает блокировку.
 
 Текущая anti-bot policy работает в режиме наблюдения. Настоящий
 `decision=deny` появится только после проверки wire-level baseline и правил для
@@ -36,7 +50,7 @@ Nginx / Go TLS observer
 /var/log/httpfin/security.log
   ↓  failregex
 Fail2ban jail
-  ↓  nftables-multiport или другой локальный action
+  ↓  nftables[type=multiport] или другой локальный action
 временная блокировка IP
 ```
 
@@ -119,11 +133,31 @@ maxretry = 3
 findtime = 10m
 bantime = 10m
 port = http,https
-banaction = nftables-multiport
+banaction = nftables[type=multiport]
 ```
 
-Сначала оставьте `enabled = false`, проверьте matches, затем используйте
-короткий ban:
+Сначала оставьте `enabled = false` и проверьте matches. Только после проверки
+trusted proxy, allowlist и тестового `deny` включайте jail в отдельном `.local`:
+
+```ini
+[httpfin-bot]
+enabled = true
+filter = httpfin-bot-deny
+logpath = /var/log/httpfin/security.log
+banaction = nftables[type=multiport]
+action = %(action_)s
+maxretry = 3
+findtime = 10m
+bantime = 10m
+ignoreip = 127.0.0.1/8 ::1
+```
+
+В старых пакетах Ubuntu может использоваться имя `nftables-multiport`. Если
+современный action отсутствует, проверьте доступные actions командой
+`fail2ban-client -d` и используйте имя, которое предоставляет установленная
+версия Fail2ban.
+
+После этого используйте короткий ban:
 
 ```bash
 sudo fail2ban-client reload
@@ -139,8 +173,8 @@ sudo fail2ban-client set httpfin-bot unbanip 198.51.100.23
 ```
 
 Название action и требования к firewall зависят от дистрибутива. Убедитесь,
-что `nftables-multiport` установлен, и проверьте созданные правила до включения
-production jail.
+что выбранный action (`nftables[type=multiport]` или совместимый legacy-вариант)
+доступен, и проверьте созданные правила до включения production jail.
 
 ## Reverse proxy: нельзя блокировать proxy
 
@@ -158,18 +192,18 @@ real_ip_recursive on;
 храните отдельно. Перед включением ban проверьте запросом из недоверенной сети,
 что в security-log попадает реальный клиентский IP.
 
-## Docker
+## Почему это не Docker-режим
 
-В container smoke-test файл `/run/httpfin/security.log` находится внутри
-контейнера. После удаления контейнера host Fail2ban его не увидит. Для
-production выберите один явный способ доставки:
+Пример `docker compose` предназначен для наблюдения и smoke-тестов. Не нужно
+добавлять Fail2ban в этот Compose и не нужно выдавать контейнеру доступ к
+firewall хоста.
 
-- bind-mount каталога с `security.log` на хост;
-- отправка событий в journald;
-- передача container logs в host log collector с последующим `logpath`.
-
-Не указывайте host Fail2ban на произвольный Docker JSON log без проверки
-rotation, timestamp, прав и фактического формата строк.
+Если приложение обязательно работает в контейнере, это уже отдельная схема:
+security-log должен быть явно доступен host Fail2ban через bind-mount или
+проверенный сборщик журналов. Произвольный Docker JSON log использовать нельзя:
+сначала нужно проверить rotation, временные метки, права и точный формат строк.
+Для штатной реализации Fail2ban предпочтителен запуск `httpfin` и Nginx на
+хосте либо отдельная host-интеграция с журналом.
 
 ## Диагностика
 

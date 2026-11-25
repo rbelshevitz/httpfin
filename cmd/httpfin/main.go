@@ -13,30 +13,46 @@ import (
 
 	"httpfin/internal/baseline"
 	"httpfin/internal/demo"
+	"httpfin/internal/fingerprint"
 	"httpfin/internal/ingest"
 	"httpfin/internal/model"
+	"httpfin/internal/policy"
 	"httpfin/internal/securitylog"
 	"httpfin/internal/tlsinspect"
 )
 
 func main() {
-	store := model.NewStore(demo.Connections())
+	// Demo data is opt-in. A production collector must never present synthetic
+	// observations as if they came from the edge.
+	var initial []model.Connection
+	if os.Getenv("httpfin_demo") == "1" {
+		initial = demo.Connections()
+	}
+	store := model.NewStore(initial)
 	clientBaseline, err := baseline.Load(os.Getenv("httpfin_baseline_file"))
 	if err != nil {
 		log.Printf("baseline disabled: %v", err)
 	}
-	stopIngest, ingestHealthy, err := ingest.StartUnixDatagram(os.Getenv("httpfin_socket"), store)
-	if err != nil {
-		log.Printf("cannot start ingest: %v", err)
-		return
-	}
-	defer stopIngest()
 	security, err := securitylog.New(os.Getenv("httpfin_security_log"))
 	if err != nil {
 		log.Printf("cannot start security log: %v", err)
 		return
 	}
 	defer security.Close()
+	nginxEventHandler := func(c model.Connection) {
+		c.DetectedProfile = fingerprint.ProfileFromUA(c.UserAgent)
+		c = clientBaseline.Observe(c)
+		store.Add(c)
+		_ = security.RecordRequest(c.ClientIP, c.URL, c.Status)
+		decision := policy.Evaluate(c)
+		_ = security.RecordBotDecision(c.ClientIP, c.URL, decision.Action, decision.Reason, decision.Confidence)
+	}
+	stopIngest, ingestHealthy, err := ingest.StartUnixDatagramWithHandler(os.Getenv("httpfin_socket"), store, nginxEventHandler)
+	if err != nil {
+		log.Printf("cannot start ingest: %v", err)
+		return
+	}
+	defer stopIngest()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/connections", connectionsHandler(store))
 	mux.HandleFunc("/api/report", reportHandler(store))
@@ -48,7 +64,9 @@ func main() {
 	}
 	mux.Handle("/", webHandler())
 
-	addr := envOr("httpfin_addr", ":8080")
+	// The collector API is intended to be reached through Nginx or a private
+	// control plane. Bind loopback by default; explicitly opt into a wider bind.
+	addr := envOr("httpfin_addr", "127.0.0.1:8080")
 	log.Printf("httpfin inspector listening on http://%s", addr)
 	errCh := make(chan error, 2)
 	plainServer := &http.Server{

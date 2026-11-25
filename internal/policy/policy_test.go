@@ -24,3 +24,16 @@ func TestEvaluateDoesNotTrustUserAgentAlone(t *testing.T) {
 		t.Fatalf("User-Agent alone must not trigger policy: %#v", got)
 	}
 }
+
+func TestEvaluateTreatsLikeSuffixAsSameProfile(t *testing.T) {
+	got := Evaluate(model.Connection{
+		ClientHelloSig:   "hello",
+		UAConsistency:    "Mismatch",
+		BaselineStatus:   "unknown",
+		ReferenceProfile: "Chrome",
+		DetectedProfile:  "Chrome-like",
+	})
+	if got.Action != "" {
+		t.Fatalf("equivalent profile names must not create a mismatch decision: %#v", got)
+	}
+}

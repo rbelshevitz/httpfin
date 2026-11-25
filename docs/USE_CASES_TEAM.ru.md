@@ -23,7 +23,7 @@ httpfin — не «ещё один логгер», а контрольная т�
 
 ### Канарейка и регрессия
 
-Хранить baseline по версии Nginx/OpenSSL/браузера и сравнивать его после rollout. Нормальный drift должен иметь статус `drifted`, а не автоматически превращаться в блокировку.
+Хранить baseline по версии Nginx/OpenSSL/браузера и сравнивать его после rollout. Нормальный drift должен иметь статус `mismatch`/`unknown`, а не автоматически превращаться в блокировку.
 
 ## API-тестировщики / QA
 
@@ -171,7 +171,8 @@ Nginx worker → sendmsg(AF_UNIX, SOCK_DGRAM) → /run/httpfin/events.sock → G
 Событие — версия `1` формата обмена, которое Go нормализует в `Connection`.
 Отправка best-effort: модуль не ждёт ответа Go и не делает синхронный network
 call в request phase. Если нужен lossless-аудит, сохраняйте access log и
-сверяйте его с collector-метриками.
+сверяйте его с `/api/connections` и ошибками Go-приёмника в журнале. Отдельных
+счётчиков потерь в текущем runtime нет.
 
 Не стоит помещать в Nginx-модуль SQLite, отчёты, baseline registry или сложный rule engine. Динамические модули загружаются через `load_module`, поэтому нужно собирать модуль совместимо с конкретной версией Nginx. ([NGINX dynamic modules](https://docs.nginx.com/nginx/admin-guide/dynamic-modules/))
 

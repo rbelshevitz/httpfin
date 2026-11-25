@@ -25,7 +25,7 @@ func requestLogger(next http.Handler, store *model.Store, security *securitylog.
 			return
 		}
 		ua := r.UserAgent()
-		c := model.Connection{ID: fmt.Sprintf("http-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ElapsedMS: time.Since(started).Milliseconds(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), Status: recorder.status, Bytes: int64(recorder.bytes), UserAgent: ua, Protocol: r.Proto, DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Unknown", Risk: "Info"}
+		c := model.Connection{ID: fmt.Sprintf("http-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ElapsedMS: time.Since(started).Milliseconds(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), Status: recorder.status, Bytes: int64(recorder.bytes), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-http", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Unknown", Risk: "Info"}
 		store.Add(c)
 		decision := policy.Evaluate(c)
 		_ = security.RecordBotDecision(c.ClientIP, c.URL, decision.Action, decision.Reason, decision.Confidence)
@@ -37,7 +37,7 @@ func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.O
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		ua := r.UserAgent()
-		c := model.Connection{ID: fmt.Sprintf("tls-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), UserAgent: ua, Protocol: r.Proto, DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Matched", Risk: "Low"}
+		c := model.Connection{ID: fmt.Sprintf("tls-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-tls", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Matched", Risk: "Low"}
 		if r.TLS != nil {
 			c.TLSVersion = fingerprint.TLSVersionName(r.TLS.Version)
 			c.ALPN = r.TLS.NegotiatedProtocol

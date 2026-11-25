@@ -44,7 +44,8 @@ real observation; do not replace it with the HTTP `Host` value.
 The Nginx access log contains a diagnostic `handoff` variable. It may still
 show `not_sent` because Nginx log variables can be evaluated before the module
 log handler runs. Verify delivery through `/api/connections` and collector
-errors/counters rather than that access-log field alone.
+errors in the log rather than that access-log field alone. Runtime loss counters
+are not enabled yet.
 
 Possible module states include `sent`, `unavailable`,
 `dropped_backpressure`, `dropped_error`, and `oversize`. Backpressure is a
@@ -88,3 +89,9 @@ database, cgo, or collector-wait operations in a request phase.
 3. Keep reports for a limited period and mask secrets in URLs and query strings.
 4. Upgrade Nginx and the native module as one compatible pair.
 5. Treat fingerprints as diagnostic signals, not as the only blocking input.
+
+Emergency bypass: set `httpfin off;` in the affected `server` or `location`,
+run `nginx -t`, and reload Nginx. This removes module handoff from the request
+path while leaving the proxy and access log available. Keep the Go collector
+running until the incident is diagnosed, then restore `httpfin on;` on the
+canary first and repeat the event/access-log comparison.

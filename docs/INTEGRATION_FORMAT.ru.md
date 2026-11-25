@@ -15,7 +15,9 @@ Nginx ── TLS termination, SNI/ALPN, proxy, access log
           │ best-effort JSON
           ▼
       Go httpfin
-        │ normalize, store, classify, report, UI/API
+        │ normalize, profile, baseline, policy, store, report, UI/API
+        ├─ optional security-log
+        └─ Fail2ban на хосте только при явном deny и включённом jail
 ```
 
 ### Nginx
@@ -117,8 +119,9 @@ Go-процесс владеет семантикой продукта:
 
 `handoff=not_sent` в этой же строке не обязательно означает потерю. Встроенный
 Nginx log handler может вычислить переменные раньше обработчика модуля в
-`LOG_PHASE`. Поэтому доставку проверяют по Go API и collector-метрикам, а не
-по одному полю этой строки.
+`LOG_PHASE`. Поэтому доставку сейчас проверяют по Go API и сопоставлением с
+access log, а не по одному полю этой строки. Отдельные счётчики потерь пока не
+включены в runtime.
 
 ### 2. Unix datagram от модуля
 
@@ -147,28 +150,48 @@ Nginx не завершал TLS, модуль включён в plain HTTP serve
   "tls_version": "TLS 1.3",
   "sni": "inspector.example.test",
   "alpn": "h2",
-  "detected_profile": "Unknown",
+  "detected_profile": "Generic HTTP",
   "ua_consistency": "Unknown",
   "risk": "Info"
 }
 ```
 
-Профиль `Unknown` для Nginx handoff — нормальное состояние текущего тонкого
-адаптера. JA3/JA4 и HTTP/2 fingerprint требуют отдельного наблюдения ClientHello
-и HTTP/2 connection frames; их нельзя честно восстановить из одного HTTP
-request event.
+Профиль Nginx handoff определяется по заявленному User-Agent и потому остаётся
+эвристикой. Если User-Agent отсутствует или неизвестен, будет `Unknown`. JA3/JA4
+и HTTP/2 fingerprint требуют отдельного наблюдения ClientHello и HTTP/2
+connection frames; их нельзя честно восстановить из одного HTTP request event.
 
 ### 4. Squid-style отчёт
 
-`GET /api/report` объединяет operational summary и fingerprint details:
+`GET /api/report` объединяет operational summary и fingerprint details. В отчёте
+есть отдельная сводка клиентов: число запросов, последний профиль и
+observe-only bot-сигнал (`suspected`/`not_suspected`) с причиной. Для каждого
+наблюдения показывается изменение TLS/ALPN/ClientHello/JA3/JA4/HTTP2 относительно
+предыдущего события того же client IP. Рядом указываются точка наблюдения и
+состояние evidence (`http-only`, `transport-only`, `partial-wire`). При отсутствии предыдущего события или
+данных выводится `unknown`, а не mismatch. Секретные query-параметры
+редактируются на границе отчёта:
 
 ```text
 httpfin CLIENT FINGERPRINT INSPECTOR REPORT
+Evidence policy: missing fields are unknown; fingerprints are signals, not identity proof
+Observations: 1
+
+CLIENTS AND BOT SIGNALS
+CLIENT                       REQUESTS LATEST PROFILE     BOT SIGNAL       SUSPECTED    NOT SUSPECTED
+172.17.0.1                   1        Unknown            not_suspected    0            1
+
+ACCESS SUMMARY
 TIME                 MS     CLIENT                       ST     BYTES    METHOD           PROFILE        RISK
 2026-11-25 15:43:34  0      172.17.0.1                  204    0        GET /healthz     Unknown        Info
 
-FINGERPRINT DETAILS
-[2026-11-25T15:43:34Z] id=15-0 172.17.0.1 | protocol=HTTP sni=inspector.example.test tls=TLS 1.3 alpn=h2 offered_alpn=- hello=- ja3=- ja4=- http2=- ua=curl/8.10.1 consistency=Unknown baseline=-/- status=-
+OBSERVATION DETAILS
+[2026-11-25T15:43:34Z] id=15-0 client=172.17.0.1 request=GET /healthz status=204 bytes=0 duration_ms=0
+  observation: point=nginx-http-module evidence=transport-only
+  transport: protocol=HTTP tls=TLS 1.3 sni=inspector.example.test alpn=h2 offered_alpn=unknown
+  fingerprints: client_hello=unknown ja3=unknown ja4=unknown http2=unknown
+  bot_signal: status=not_suspected action=unknown confidence=0.00 reason=insufficient independent signals
+  fingerprint_change: no_previous_observation
 ```
 
 Для отчёта важно разделять факт доставки события и наличие fingerprint:

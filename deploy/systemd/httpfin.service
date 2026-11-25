@@ -1,0 +1,27 @@
+[Unit]
+Description=httpfin HTTP/TLS observer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=httpfin
+Group=httpfin
+EnvironmentFile=-/etc/httpfin/httpfin.env
+ExecStart=/usr/local/bin/httpfin
+Restart=on-failure
+RestartSec=2s
+UMask=0007
+RuntimeDirectory=httpfin
+RuntimeDirectoryMode=0770
+LogsDirectory=httpfin
+LogsDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run/httpfin /var/log/httpfin
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

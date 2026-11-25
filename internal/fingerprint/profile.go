@@ -20,9 +20,42 @@ func ClientIP(r *http.Request) string {
 func ProfileFromUA(ua string) string {
 	lower := strings.ToLower(ua)
 	switch {
+	case strings.Contains(lower, "; wv)") || strings.Contains(lower, "; wv;") || strings.HasSuffix(lower, "; wv"):
+		return "Android WebView-like"
+	case strings.Contains(lower, "samsungbrowser"):
+		return "Samsung Internet-like"
+	case strings.Contains(lower, "yabrowser"):
+		return "Yandex Browser-like"
+	case strings.Contains(lower, "ucbrowser") || strings.Contains(lower, "ucweb"):
+		return "UC Browser-like"
+	case strings.Contains(lower, "huaweibrowser"):
+		return "Huawei Browser-like"
+	case strings.Contains(lower, "miuibrowser"):
+		return "Mi Browser-like"
+	case strings.Contains(lower, "duckduckgo"):
+		return "DuckDuckGo-like"
+	case strings.Contains(lower, "fban") || strings.Contains(lower, "fbav") || strings.Contains(lower, "instagram") || strings.Contains(lower, "line/"):
+		return "In-App WebView-like"
+	case strings.Contains(lower, "edgios"):
+		return "Edge iOS-like"
+	case strings.Contains(lower, "edga/"):
+		return "Edge Android-like"
+	case strings.Contains(lower, "edg/"):
+		return "Edge-like"
+	case strings.Contains(lower, "opera mini") || strings.Contains(lower, "opera mobi"):
+		return "Opera Mobile-like"
+	case strings.Contains(lower, "opr/") || strings.Contains(lower, "opera"):
+		return "Opera-like"
+	case strings.Contains(lower, "fxios"):
+		return "Firefox iOS-like"
+	case strings.Contains(lower, "crios"):
+		return "Chrome iOS-like"
 	case strings.Contains(lower, "firefox"):
 		return "Firefox-like"
-	case strings.Contains(lower, "chrome"), strings.Contains(lower, "edg"):
+	case strings.Contains(lower, "chrome"):
+		if strings.Contains(lower, "android") {
+			return "Chrome Android-like"
+		}
 		return "Chrome-like"
 	case strings.Contains(lower, "safari"):
 		return "Safari-like"

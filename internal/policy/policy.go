@@ -1,6 +1,9 @@
 package policy
 
-import "httpfin/internal/model"
+import (
+	"httpfin/internal/model"
+	"strings"
+)
 
 type Decision struct {
 	Action     string
@@ -19,8 +22,27 @@ func Evaluate(c model.Connection) Decision {
 		return Decision{Action: "observe", Reason: "ua_tls_baseline_mismatch", Confidence: 0.95}
 	}
 	if c.UAConsistency == "Mismatch" && c.ReferenceProfile != "" &&
-		c.DetectedProfile != c.ReferenceProfile {
+		!sameProfile(c.DetectedProfile, c.ReferenceProfile) {
 		return Decision{Action: "observe", Reason: "ua_reference_profile_mismatch", Confidence: 0.90}
 	}
 	return Decision{}
+}
+
+func sameProfile(observed, reference string) bool {
+	if observed == "" || reference == "" {
+		return false
+	}
+	observed = normalizeProfile(observed)
+	reference = normalizeProfile(reference)
+	return observed == reference || observed+"-like" == reference || observed == reference+"-like"
+}
+
+func normalizeProfile(value string) string {
+	value = strings.TrimSpace(value)
+	for _, suffix := range []string{"-like", " browser"} {
+		for strings.HasSuffix(value, suffix) {
+			value = strings.TrimSuffix(value, suffix)
+		}
+	}
+	return value
 }

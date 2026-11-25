@@ -17,6 +17,7 @@ type Connection struct {
 	Bytes             int64     `json:"bytes"`
 	UserAgent         string    `json:"user_agent"`
 	Protocol          string    `json:"protocol"`
+	ObservationPoint  string    `json:"observation_point,omitempty"`
 	TLSVersion        string    `json:"tls_version"`
 	ALPN              string    `json:"alpn"`
 	ALPNOffered       string    `json:"alpn_offered,omitempty"`
