@@ -110,8 +110,8 @@ Go does not connect back to the module. If Go is unavailable, Nginx continues
 serving requests; the event is best-effort telemetry and may be lost.
 
 The module does not parse raw ClientHello, calculate JA3/JA4 or observe
-connection-level HTTP/2 SETTINGS. Use direct Go TLS mode or a separate
-wire-observer for those signals.
+connection-level HTTP/2 SETTINGS. Those signals require a separate TLS entry
+program or a future direct-Go mode with that capability.
 
 See [`nginx-module/README.md`](nginx-module/README.md) and
 [`docs/INTEGRATION_FORMAT.md`](docs/INTEGRATION_FORMAT.md).
@@ -124,11 +124,12 @@ See [`nginx-module/README.md`](nginx-module/README.md) and
 - heuristic profiles for desktop and mobile clients such as `Chrome-like`,
   `Chrome Android-like`, `Edge-like`, `Firefox-like`, `Samsung Internet-like`,
   `Android WebView-like`, or `Generic HTTP`;
-- The current Nginx HTTP module does not produce JA3/JA4 or connection-level
-  HTTP/2 fingerprints. To collect them, a separate program must accept the TLS
-  connection before Nginx, or replace Nginx as the TLS entry point, read
-  ClientHello and HTTP/2 connection frames, and pass the resulting values to
-  `httpfin`.
+
+The current Nginx HTTP module does not produce JA3/JA4 or connection-level
+HTTP/2 fingerprints. To collect them, a separate program must accept the TLS
+connection before Nginx, or replace Nginx as the TLS entry point, read
+ClientHello and HTTP/2 connection frames, and pass the resulting values to
+`httpfin`.
 
 User-Agent and fingerprints are client-controlled or imitable signals. An
 empty fingerprint means that the observation point did not have the required

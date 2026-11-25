@@ -111,9 +111,9 @@ Go не подключается обратно к модулю. Если Go н�
 обслуживать запросы; передача события выполняется в режиме best-effort, поэтому
 событие может потеряться.
 
-Модуль не разбирает raw ClientHello, не считает JA3/JA4 и не видит
-connection-level HTTP/2 SETTINGS. Для этих сигналов нужен direct Go TLS mode
-или отдельный wire-observer.
+Модуль не разбирает исходный ClientHello, не считает JA3/JA4 и не видит
+настройки HTTP/2 на уровне соединения. Для этого нужен отдельный TLS-вход с
+поддержкой такого анализа.
 
 Подробности: [`nginx-module/README.md`](nginx-module/README.md) и
 [`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md).
@@ -126,10 +126,11 @@ connection-level HTTP/2 SETTINGS. Для этих сигналов нужен di
 - эвристические профили desktop и mobile-клиентов: `Chrome-like`,
   `Chrome Android-like`, `Edge-like`, `Firefox-like`, `Samsung Internet-like`,
   `Android WebView-like` и `Generic HTTP`;
-- Текущий HTTP-модуль Nginx не создаёт JA3/JA4 и отпечаток HTTP/2 на уровне
-  соединения. Для этого нужна отдельная программа перед Nginx или вместо него
-  на входе TLS: она принимает TLS, читает ClientHello и кадры HTTP/2, а затем
-  передаёт результаты в `httpfin`.
+
+Текущий HTTP-модуль Nginx не создаёт JA3/JA4 и отпечаток HTTP/2 на уровне
+соединения. Для этого нужна отдельная программа перед Nginx или вместо него на
+входе TLS. Она принимает TLS, читает ClientHello и кадры HTTP/2, а затем
+передаёт результаты в `httpfin`.
 
 User-Agent и fingerprint — управляемые клиентом или имитируемые признаки.
 Пустой fingerprint означает отсутствие нужных данных в точке наблюдения, а не
