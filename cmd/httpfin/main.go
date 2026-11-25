@@ -22,12 +22,14 @@ func main() {
 	store := model.NewStore(demo.Connections())
 	stopIngest, ingestHealthy, err := ingest.StartUnixDatagram(os.Getenv("httpfin_socket"), store)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("cannot start ingest: %v", err)
+		return
 	}
 	defer stopIngest()
 	security, err := securitylog.New(os.Getenv("httpfin_security_log"))
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("cannot start security log: %v", err)
+		return
 	}
 	defer security.Close()
 	mux := http.NewServeMux()

@@ -108,11 +108,11 @@ func truncate(value string, limit int) string {
 func eventForStatus(status int) (reason, event string, ok bool) {
 	switch status {
 	case http.StatusUnauthorized:
-		return "invalid_credentials", "auth_failure", true
+		return "status_401", "http_status_denied", true
 	case http.StatusForbidden:
-		return "access_denied", "access_denied", true
+		return "status_403", "http_status_denied", true
 	case http.StatusTooManyRequests:
-		return "rate_limit", "rate_limit", true
+		return "status_429", "http_status_denied", true
 	default:
 		return "", "", false
 	}

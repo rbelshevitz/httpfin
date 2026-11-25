@@ -7,9 +7,9 @@
 httpfin_security_log=/var/log/httpfin/security.log go run ./cmd/httpfin
 ```
 
-По умолчанию поток выключен. Сейчас logger пишет ограниченные события для
-HTTP status `401`, `403` и `429`; прикладной смысл authentication или rate
-limit он пока не знает.
+По умолчанию поток выключен. Сейчас logger пишет нейтральные ограниченные
+события `http_status_denied` для HTTP status `401`, `403` и `429`; они не
+объявляются ошибкой authentication или вредоносностью бота.
 
 Только для container smoke test переменная `httpfin_test_endpoint=1` включает
 закрытый endpoint `/__httpfin_test/unauthorized`. По умолчанию он выключен и не
@@ -68,7 +68,7 @@ strings, полный User-Agent или fingerprint blobs.
 ```ini
 # /etc/fail2ban/filter.d/httpfin-api.conf
 [Definition]
-failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=(auth_failure|access_denied|rate_limit)\s+endpoint=\S+\s+status=\d{3}\s+reason=\S+\s*$
+failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=http_status_denied\s+endpoint=\S+\s+status=(401|403|429)\s+reason=status_\d{3}\s*$
 ignoreregex =
 ```
 

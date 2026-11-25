@@ -27,7 +27,7 @@ func TestRecordRequestWritesSafeEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := string(data)
-	if !strings.Contains(line, "src=203.0.113.8 event=auth_failure endpoint=/v1/login status=401 reason=invalid_credentials") {
+	if !strings.Contains(line, "src=203.0.113.8 event=http_status_denied endpoint=/v1/login status=401 reason=status_401") {
 		t.Fatalf("unexpected event: %q", line)
 	}
 	if strings.Contains(line, "token=secret") || strings.Count(line, "httpfin-security") != 1 {

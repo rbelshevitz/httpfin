@@ -86,7 +86,7 @@ $compose exec -T httpfin wget --no-check-certificate -qO- \
 
 security_log=$($compose exec -T httpfin sh -c 'cat /run/httpfin/security.log')
 printf '%s\n' "$security_log" | grep -Eq \
-	'event=auth_failure endpoint=/__httpfin_test/unauthorized status=401 reason=invalid_credentials'
+	'event=http_status_denied endpoint=/__httpfin_test/unauthorized status=401 reason=status_401'
 if printf '%s\n' "$security_log" | grep -Eq 'token=|cookie=|authorization='; then
 	echo "security log contains a forbidden secret-like field" >&2
 	exit 1

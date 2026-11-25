@@ -7,9 +7,10 @@ firewall commands. Enable it with:
 httpfin_security_log=/var/log/httpfin/security.log go run ./cmd/httpfin
 ```
 
-The default is disabled. The current logger emits bounded events for HTTP
-statuses `401`, `403`, and `429`; it does not know application-specific
-authentication or rate-limit semantics yet.
+The default is disabled. The current logger emits neutral bounded
+`http_status_denied` events for HTTP statuses `401`, `403`, and `429`; it does
+not claim that these statuses mean authentication failure or malicious bot
+activity.
 
 For container smoke tests only, `httpfin_test_endpoint=1` exposes a gated
 `/__httpfin_test/unauthorized` endpoint. It is disabled by default and must not
@@ -67,7 +68,7 @@ until the filter is tested against real samples:
 ```ini
 # /etc/fail2ban/filter.d/httpfin-api.conf
 [Definition]
-failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=(auth_failure|access_denied|rate_limit)\s+endpoint=\S+\s+status=\d{3}\s+reason=\S+\s*$
+failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=http_status_denied\s+endpoint=\S+\s+status=(401|403|429)\s+reason=status_\d{3}\s*$
 ignoreregex =
 ```
 
