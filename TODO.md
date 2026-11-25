@@ -25,7 +25,7 @@ rules and does not block clients.
 - [ ] Host deployment smoke test covering permissions, restart, health checks,
   report download, and graceful shutdown.
 
-## Long-term items
+## Long-term tasks
 
 - [ ] Optional SQLite history for searching observations across restarts. Do not
   enable it by default.
@@ -34,9 +34,12 @@ rules and does not block clients.
   extension of the current HTTP module.
 - [ ] Automatic profile updates and distributed storage.
 
-## Constraints
+## Current constraints
 
-- The Nginx HTTP module cannot see passthrough traffic or parse ClientHello.
-- Unix datagram handoff is best effort; complete audit requires access logs or a
-  future durable store.
+- The HTTP module works only after TLS termination. It does not see passthrough
+  traffic and cannot parse the original ClientHello.
+- The Unix datagram is a fast, best-effort handoff. If the collector is stopped
+  or overloaded, an event can be lost while the client request still succeeds.
+- Access logs are needed when every request must be accounted for. They provide
+  request records, while a future durable store would retain httpfin details.
 - Dynamic modules must match the Nginx version and libc used at runtime.
