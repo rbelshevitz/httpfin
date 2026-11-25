@@ -14,6 +14,7 @@ import (
 	"httpfin/internal/demo"
 	"httpfin/internal/ingest"
 	"httpfin/internal/model"
+	"httpfin/internal/securitylog"
 	"httpfin/internal/tlsinspect"
 )
 
@@ -24,6 +25,11 @@ func main() {
 		log.Fatal(err)
 	}
 	defer stopIngest()
+	security, err := securitylog.New(os.Getenv("httpfin_security_log"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer security.Close()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/connections", connectionsHandler(store))
 	mux.HandleFunc("/api/report", reportHandler(store))
@@ -35,7 +41,7 @@ func main() {
 	errCh := make(chan error, 2)
 	plainServer := &http.Server{
 		Addr:              addr,
-		Handler:           requestLogger(mux, store),
+		Handler:           requestLogger(mux, store, security),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -55,7 +61,7 @@ func main() {
 			log.Printf("httpfin inspector listening on https://%s (SNI + ALPN capture enabled)", tlsAddr)
 			tlsServer = &http.Server{
 				Addr:              tlsAddr,
-				Handler:           NewTLSHandler(mux, store, observer),
+				Handler:           NewTLSHandler(mux, store, observer, security),
 				TLSConfig:         config,
 				ReadHeaderTimeout: 5 * time.Second,
 				ReadTimeout:       15 * time.Second,

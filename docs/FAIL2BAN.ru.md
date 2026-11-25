@@ -1,7 +1,21 @@
 # Интеграция с Fail2ban
 
-Это проект интеграции на будущее. Текущая версия `httpfin` ещё не пишет
-специальный security-log для Fail2ban и не выполняет firewall-команды.
+`httpfin` уже умеет opt-in писать security-log для Fail2ban. Firewall-команды
+он не выполняет. Включение:
+
+```bash
+httpfin_security_log=/var/log/httpfin/security.log go run ./cmd/httpfin
+```
+
+По умолчанию поток выключен. Сейчас logger пишет ограниченные события для
+HTTP status `401`, `403` и `429`; прикладной смысл authentication или rate
+limit он пока не знает.
+
+Anti-bot policy отделён от этого общего abuse-сигнала. Он пишет
+`event=bot_suspected` только при наличии двух независимых mismatch-признаков.
+Первое действие — `decision=observe`; один User-Agent не превращается в бан.
+Будущий policy adapter сможет писать `decision=deny` только после проверки
+baseline и правила для конкретного endpoint.
 
 ## Разделение ответственности
 
@@ -50,7 +64,16 @@ strings, полный User-Agent или fingerprint blobs.
 ```ini
 # /etc/fail2ban/filter.d/httpfin-api.conf
 [Definition]
-failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=(auth_failure|rate_limit|malformed_request)\s+endpoint=\S+\s+status=\d{3}\s+reason=\S+\s*$
+failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=(auth_failure|access_denied|rate_limit)\s+endpoint=\S+\s+status=\d{3}\s+reason=\S+\s*$
+ignoreregex =
+```
+
+Для anti-bot jail нужно принимать только явное решение deny:
+
+```ini
+# /etc/fail2ban/filter.d/httpfin-bot-deny.conf
+[Definition]
+failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=bot_suspected\s+endpoint=\S+\s+decision=deny\s+confidence=\d+\.\d+\s+reason=\S+\s*$
 ignoreregex =
 ```
 
@@ -97,7 +120,7 @@ journald entry или другой явно настроенный transport: st
 
 ## Безопасный rollout
 
-1. Писать события при выключенном jail.
+1. Включить `httpfin_security_log` при выключенном jail.
 2. Проверить positive и negative fixtures через `fail2ban-regex`.
 3. Включить observe-only и проверить false positives.
 4. Начать с короткой временной блокировки и узкого набора портов.

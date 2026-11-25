@@ -30,6 +30,9 @@
   наблюдения и контекст приложения; не помещать rule engine в Nginx worker.
 - [ ] Начать с режима **observe-only**: показывать причины и трассу решения,
   не изменяя запрос.
+- [x] Добавить первый anti-bot evaluator по двум сигналам с
+  `decision=observe`; не включать `decision=deny` до появления wire-level
+  baseline и replay-тестов.
 - [ ] Добавить **shadow mode**: считать решения `challenge/throttle/allow` и
   сравнивать их с фактическими результатами операторов.
 - [ ] Определить объяснимые действия: `allow`, `review`, `challenge`,
@@ -49,12 +52,12 @@ journal, а не парсить `/api/report` и JSON наблюдений. `htt
 события, Fail2ban на хосте считает пороги и применяет firewall action. См.
 [`docs/FAIL2BAN.ru.md`](docs/FAIL2BAN.ru.md).
 
-- [ ] Определить стабильный построчный формат security event для Fail2ban:
+- [x] Определить стабильный построчный формат security event для Fail2ban:
   timestamp, source IP, endpoint, reason code, confidence и correlation ID;
   не писать в ban-log URL, токены, cookies и полный User-Agent.
-- [ ] Добавить opt-in security log или exporter отдельно от человекочитаемого
+- [x] Добавить opt-in security log или exporter отдельно от человекочитаемого
   отчёта и JSON API наблюдений.
-- [ ] Подготовить пример `jail.local` и filter для повторяющихся и объяснимых
+- [x] Подготовить пример `jail.local` и filter для повторяющихся и объяснимых
   событий: превышение rate limit, abuse авторизации, malformed requests или
   решение будущего policy-gatekeeper.
 - [ ] Добавить режим `dry-run`/observe-only и явный порог срабатываний до

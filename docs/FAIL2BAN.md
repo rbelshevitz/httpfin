@@ -1,7 +1,21 @@
 # Fail2ban integration design
 
-This is a design for a future integration. The current `httpfin` release does
-not emit a Fail2ban security log and does not execute firewall commands.
+`httpfin` can now emit an opt-in Fail2ban security log. It does not execute
+firewall commands. Enable it with:
+
+```bash
+httpfin_security_log=/var/log/httpfin/security.log go run ./cmd/httpfin
+```
+
+The default is disabled. The current logger emits bounded events for HTTP
+statuses `401`, `403`, and `429`; it does not know application-specific
+authentication or rate-limit semantics yet.
+
+The anti-bot policy is separate. It emits `event=bot_suspected` only when the
+current evidence contains two independent mismatch signals. Its first action is
+`decision=observe`; it never turns a User-Agent string into a ban. A future
+policy adapter may emit `decision=deny` after a reviewed baseline and an
+endpoint-specific rule.
 
 ## Responsibility split
 
@@ -49,7 +63,16 @@ until the filter is tested against real samples:
 ```ini
 # /etc/fail2ban/filter.d/httpfin-api.conf
 [Definition]
-failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=(auth_failure|rate_limit|malformed_request)\s+endpoint=\S+\s+status=\d{3}\s+reason=\S+\s*$
+failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=(auth_failure|access_denied|rate_limit)\s+endpoint=\S+\s+status=\d{3}\s+reason=\S+\s*$
+ignoreregex =
+```
+
+For the anti-bot jail, match only an explicit deny decision:
+
+```ini
+# /etc/fail2ban/filter.d/httpfin-bot-deny.conf
+[Definition]
+failregex = ^httpfin-security\s+ts=\S+\s+src=<HOST>\s+event=bot_suspected\s+endpoint=\S+\s+decision=deny\s+confidence=\d+\.\d+\s+reason=\S+\s*$
 ignoreregex =
 ```
 
@@ -98,7 +121,7 @@ by `logpath`.
 
 ## Safe rollout
 
-1. Emit events with the jail disabled.
+1. Enable the `httpfin_security_log` stream with the jail disabled.
 2. Run `fail2ban-regex` against positive and negative fixtures.
 3. Enable observe-only reporting and inspect false positives.
 4. Use a short temporary ban and a narrow port set.

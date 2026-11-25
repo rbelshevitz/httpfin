@@ -29,6 +29,8 @@ policy in separate, explicit stages.
   application context; do not put a rule engine in the Nginx worker.
 - [ ] Start in **observe-only** mode: produce reasons and a decision trace,
   never change the request.
+- [x] Add the first two-signal anti-bot evaluator with `decision=observe`; keep
+  `decision=deny` unavailable until wire-level baselines and replay tests exist.
 - [ ] Add **shadow mode**: calculate challenge/throttle/allow decisions and
   compare them with operator outcomes.
 - [ ] Define explainable actions: `allow`, `review`, `challenge`, `throttle`,
@@ -47,13 +49,13 @@ stream, not scrape `/api/report` or the observation JSON. `httpfin` should
 produce evidence; Fail2ban should perform thresholding and firewall actions on
 the host. See [`docs/FAIL2BAN.md`](docs/FAIL2BAN.md).
 
-- [ ] Define a stable, line-oriented security event format for Fail2ban
+- [x] Define a stable, line-oriented security event format for Fail2ban
   ingestion: timestamp, source IP, endpoint, reason code, confidence, and
   correlation ID; never put raw URLs, tokens, cookies, or full User-Agent data
   into the ban log.
-- [ ] Add an opt-in security log or exporter separate from the human report and
+- [x] Add an opt-in security log or exporter separate from the human report and
   JSON observation API.
-- [ ] Provide a sample `jail.local` and filter for repeated, explainable
+- [x] Provide a sample `jail.local` and filter for repeated, explainable
   failures such as rate-limit violations, authentication abuse, malformed
   requests, or a policy decision from the future gatekeeper.
 - [ ] Support `dry-run`/observe-only mode and an explicit ban threshold before
