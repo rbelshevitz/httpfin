@@ -49,6 +49,12 @@ The text report contains an access summary followed by fingerprint details.
 Use JSON in CI and dashboards; attach TXT to a ticket or test result. Empty
 JA3/JA4/HTTP/2 fields mean that the required wire observation was unavailable.
 
+Reports are generated synchronously from the current in-memory store when
+`GET /api/report` is handled. No report file is created by the service. A file
+appears only when the caller saves the HTTP response, for example with
+`> httpfin-report.txt`. Restarting the process clears runtime observations;
+durable retention belongs to access logs or an external storage component.
+
 ## TLS and certificates
 
 - **Nginx termination:** certificate and key belong to Nginx. Go does not need

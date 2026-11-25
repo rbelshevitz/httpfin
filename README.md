@@ -177,6 +177,26 @@ to an incident, rollout or API test result. A blank fingerprint field means
 that the observation point did not receive the required wire data; it must not
 be silently interpreted as a mismatch.
 
+### Where the report is found
+
+Reports are generated on demand; the service does not write them to a report
+directory and does not run a background exporter. Use one of these entry
+points:
+
+- open `/` and click **Export report**;
+- request `GET /api/report` in a browser or API client;
+- save the response explicitly with shell redirection.
+
+```bash
+curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
+```
+
+The file is created in the current directory of the shell running `curl`, not
+inside `httpfin`. In Docker, the file remains on the host only if the command
+is run on the host or a volume is mounted. The current store is in memory; a
+process restart clears runtime observations and restores only the built-in demo
+records. Use access logs or an external database for durable history.
+
 ## Project goals
 
 `httpfin` answers a practical question: “what client actually reached this
