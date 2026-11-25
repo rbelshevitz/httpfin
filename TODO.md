@@ -42,6 +42,11 @@ policy in separate, explicit stages.
 
 ## Fail2ban integration
 
+Design note: Fail2ban should consume a dedicated security log or journal
+stream, not scrape `/api/report` or the observation JSON. `httpfin` should
+produce evidence; Fail2ban should perform thresholding and firewall actions on
+the host. See [`docs/FAIL2BAN.md`](docs/FAIL2BAN.md).
+
 - [ ] Define a stable, line-oriented security event format for Fail2ban
   ingestion: timestamp, source IP, endpoint, reason code, confidence, and
   correlation ID; never put raw URLs, tokens, cookies, or full User-Agent data

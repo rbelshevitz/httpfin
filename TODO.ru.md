@@ -44,6 +44,11 @@
 
 ## Интеграция с Fail2ban
 
+Архитектурное решение: Fail2ban должен читать отдельный security-log или
+journal, а не парсить `/api/report` и JSON наблюдений. `httpfin` поставляет
+события, Fail2ban на хосте считает пороги и применяет firewall action. См.
+[`docs/FAIL2BAN.ru.md`](docs/FAIL2BAN.ru.md).
+
 - [ ] Определить стабильный построчный формат security event для Fail2ban:
   timestamp, source IP, endpoint, reason code, confidence и correlation ID;
   не писать в ban-log URL, токены, cookies и полный User-Agent.
