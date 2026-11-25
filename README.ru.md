@@ -117,9 +117,9 @@ connection-level HTTP/2 SETTINGS. Для этих сигналов нужен di
   `Chrome Android-like`, `Edge-like`, `Firefox-like`, `Samsung Internet-like`,
   `Android WebView-like` и `Generic HTTP`;
 - Текущий HTTP-модуль Nginx не создаёт JA3/JA4 и отпечаток HTTP/2 на уровне
-  соединения. Эти поля появятся только при подключении отдельного наблюдателя
-  TLS/HTTP2, который видит ClientHello и кадры соединения до этой точки и
-  передаёт значения в `httpfin`.
+  соединения. Для этого нужна отдельная программа перед Nginx или вместо него
+  на входе TLS: она принимает TLS, читает ClientHello и кадры HTTP/2, а затем
+  передаёт результаты в `httpfin`.
 
 User-Agent и fingerprint — управляемые клиентом или имитируемые признаки.
 Пустой fingerprint означает отсутствие нужных данных в точке наблюдения, а не

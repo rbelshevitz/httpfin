@@ -115,9 +115,10 @@ See [`nginx-module/README.md`](nginx-module/README.md) and
   `Chrome Android-like`, `Edge-like`, `Firefox-like`, `Samsung Internet-like`,
   `Android WebView-like`, or `Generic HTTP`;
 - The current Nginx HTTP module does not produce JA3/JA4 or connection-level
-  HTTP/2 fingerprints. Those fields appear only when a separate TLS/HTTP2
-  observer captures ClientHello and connection frames at an earlier observation
-  point and passes the values to `httpfin`.
+  HTTP/2 fingerprints. To collect them, a separate program must accept the TLS
+  connection before Nginx, or replace Nginx as the TLS entry point, read
+  ClientHello and HTTP/2 connection frames, and pass the resulting values to
+  `httpfin`.
 
 User-Agent and fingerprints are client-controlled or imitable signals. An
 empty fingerprint means that the observation point did not have the required
