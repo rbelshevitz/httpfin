@@ -15,9 +15,7 @@ Nginx ── TLS termination, SNI/ALPN, proxy, access log
           │ best-effort JSON
           ▼
       Go httpfin
-        │ normalize, profile, baseline, policy, store, report, UI/API
-        ├─ optional security-log
-        └─ Fail2ban на хосте только при явном deny и включённом jail
+        │ normalize, profile, baseline, store, report, UI/API
 ```
 
 ### Nginx
@@ -164,8 +162,8 @@ connection frames; их нельзя честно восстановить из 
 ### 4. Squid-style отчёт
 
 `GET /api/report` объединяет operational summary и fingerprint details. В отчёте
-есть отдельная сводка клиентов: число запросов, последний профиль и
-observe-only bot-сигнал (`suspected`/`not_suspected`) с причиной. Для каждого
+есть отдельная сводка клиентов: число запросов, последний профиль и сравнение
+с baseline. Для каждого
 наблюдения показывается изменение TLS/ALPN/ClientHello/JA3/JA4/HTTP2 относительно
 предыдущего события того же client IP. Рядом указываются точка наблюдения и
 состояние evidence (`http-only`, `transport-only`, `partial-wire`). При отсутствии предыдущего события или
@@ -177,9 +175,9 @@ httpfin CLIENT FINGERPRINT INSPECTOR REPORT
 Evidence policy: missing fields are unknown; fingerprints are signals, not identity proof
 Observations: 1
 
-CLIENTS AND BOT SIGNALS
-CLIENT                       REQUESTS LATEST PROFILE     BOT SIGNAL       SUSPECTED    NOT SUSPECTED
-172.17.0.1                   1        Unknown            not_suspected    0            1
+CLIENTS
+CLIENT                       REQUESTS LATEST PROFILE     BASELINE       EVIDENCE
+172.17.0.1                   1        Unknown            unavailable    http-only
 
 ACCESS SUMMARY
 TIME                 MS     CLIENT                       ST     BYTES    METHOD           PROFILE        RISK
@@ -190,7 +188,6 @@ OBSERVATION DETAILS
   observation: point=nginx-http-module evidence=transport-only
   transport: protocol=HTTP tls=TLS 1.3 sni=inspector.example.test alpn=h2 offered_alpn=unknown
   fingerprints: client_hello=unknown ja3=unknown ja4=unknown http2=unknown
-  bot_signal: status=not_suspected action=unknown confidence=0.00 reason=insufficient independent signals
   fingerprint_change: no_previous_observation
 ```
 

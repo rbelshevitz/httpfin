@@ -88,7 +88,7 @@ database, cgo, or collector-wait operations in a request phase.
 2. Compare collector events with access-log volume.
 3. Keep reports for a limited period and mask secrets in URLs and query strings.
 4. Upgrade Nginx and the native module as one compatible pair.
-5. Treat fingerprints as diagnostic signals, not as the only blocking input.
+5. Treat fingerprints as diagnostic evidence, not as identity proof.
 
 Emergency bypass: set `httpfin off;` in the affected `server` or `location`,
 run `nginx -t`, and reload Nginx. This removes module handoff from the request

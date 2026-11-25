@@ -5,13 +5,13 @@
 ```text
 Client → Nginx → application
            ├─ TLS termination, SNI/ALPN, proxying, access log
-           └─ native module → Unix datagram → Go httpfin → optional security log
+           └─ native module → Unix datagram → Go httpfin → report/API
 ```
 
 Nginx handles data-plane work: TLS, virtual-host selection, ALPN, proxying and
 access logging. The module creates a request ID and sends a bounded,
-non-blocking event. Go normalizes, profiles, applies baseline/policy, stores and
-reports it, and may write the host security log for an external Fail2ban setup.
+non-blocking event. Go normalizes, profiles, compares the baseline, stores and
+reports it.
 
 The event is best-effort telemetry. The module must not wait for Go, perform
 DNS/HTTP/database work, or calculate expensive fingerprints inside an Nginx
@@ -36,10 +36,9 @@ Nginx worker
        └─ bounded Unix datagram
             └─ httpfin Go executable
                  ├─ in-memory store
-                 ├─ profile/risk/baseline/policy processing
+                 ├─ profile, baseline and evidence processing
                  ├─ /api/connections and /api/report
                  ├─ inspector UI
-                 └─ optional host security log → Fail2ban
 ```
 
 The `.so` alone has no report storage, UI, API or durable queue. If the Go
@@ -100,7 +99,7 @@ curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
 ```
 
 The text report contains an access summary, a client-level summary with the
-observe-only bot signal, and per-observation fingerprint details. Each row
+baseline comparison and per-observation fingerprint details. Each row
 shows the observation point and evidence state, plus changes from the previous
 observation for the same client IP; missing evidence is rendered as `unknown`,
 not as a mismatch. Sensitive query parameters are redacted at the report

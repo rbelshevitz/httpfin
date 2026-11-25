@@ -33,7 +33,7 @@ flowchart LR
     T --> S --> B --> H --> A
 ```
 
-## Режим запуска и граница блокировки
+## Режимы запуска
 
 ```mermaid
 flowchart LR
@@ -48,22 +48,14 @@ flowchart LR
     subgraph H[Host / systemd production]
         HN[Nginx + модуль + Go]
         HA[API продукта]
-        HL[security-log]
-        HF[Fail2ban]
-        HW[nftables]
         HN --> HA
-        HN --> HL
-        HL -. только явный deny .-> HF
-        HF -. firewall-action .-> HW
     end
     C --> DN
     C --> HN
 ```
 
-Docker Compose в текущем проекте предназначен для наблюдения и smoke-тестов.
-Host/systemd-режим нужен для production: там security-log и Fail2ban работают
-как службы хоста. Fail2ban не входит в Docker-связку и не запускается без
-явного включения jail и firewall-action.
+Оба режима предназначены только для наблюдения. Docker удобен для smoke-тестов,
+а host/systemd даёт стабильные права на socket и штатный перезапуск в production.
 
 ## Что видно в каждом режиме
 
@@ -89,20 +81,13 @@ sequenceDiagram
     participant N as Nginx
     participant M as httpfin module
     participant G as Go collector
-    participant L as security-log
-    participant F as Fail2ban (host, optional)
-    participant W as nftables
     participant R as API/отчёт
 
     C->>N: TLS + HTTP-запрос
     N->>N: termination / proxy
     N->>M: post-read и log phases
     M-)G: ограниченный JSON datagram
-    G->>G: normalize, profile, baseline, policy, store
-    G->>G: observe-only by default
-    G->>L: security-log (optional)
-    L-.->F: only explicit decision=deny
-    F-.->W: explicit firewall action
+    G->>G: normalize, profile, baseline, store
     R->>G: GET /api/connections
     G-->>R: JSON observations
     R->>G: GET /api/report
@@ -120,8 +105,7 @@ Native-модуль работает только внутри HTTP-жизнен
    ограниченный набор HTTP/TLS-полей и отправляет один Unix datagram в Go.
 
 Итак, модуль — это handoff на HTTP-слое от запроса к collector. Это не TLS
-preread-модуль, не proxy и не policy engine. Go применяет policy после handoff,
-но текущая policy по умолчанию остаётся observe-only. Для passthrough SNI/ALPN используется
+preread-модуль и не proxy. Для passthrough SNI/ALPN используется
 отдельный `ngx_stream_ssl_preread_module` Nginx.
 
 ## Матрица компонентов

@@ -174,7 +174,6 @@ placeholders; replace them with the actual ingress ranges before enabling
 - A client-selected SNI is routing metadata, not client identity. TLS session
   resumption, ECH, proxies, and TLS termination topology can make a field
   unavailable or misleading.
-- The module must not be used as the sole security decision for bot detection;
   fingerprint signals are probabilistic and can be replayed.
 
 ## References

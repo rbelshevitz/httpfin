@@ -33,7 +33,7 @@ flowchart LR
     T --> S --> B --> H --> A
 ```
 
-## Runtime mode and blocking boundary
+## Runtime modes
 
 ```mermaid
 flowchart LR
@@ -48,22 +48,15 @@ flowchart LR
     subgraph H[Host / systemd production]
         HN[Nginx + module + Go]
         HA[Product API]
-        HL[security log]
-        HF[Fail2ban]
-        HW[nftables]
         HN --> HA
-        HN --> HL
-        HL -. explicit deny only .-> HF
-        HF -. explicit firewall action .-> HW
     end
     C --> DN
     C --> HN
 ```
 
-The current Docker Compose mode is for observation and smoke tests. The
-host/systemd mode is the production boundary for a host security log and
-Fail2ban. Fail2ban is not part of the Docker stack and does not run unless the
-jail and firewall action are explicitly enabled.
+Both modes are observation-only. Docker is convenient for smoke tests; the
+host/systemd mode is suitable for production because it gives the collector and
+socket stable host permissions and restart behavior.
 
 ## What each mode can observe
 
@@ -89,20 +82,13 @@ sequenceDiagram
     participant N as Nginx
     participant M as httpfin module
     participant G as Go collector
-    participant L as security log
-    participant F as Fail2ban (host, optional)
-    participant W as nftables
     participant R as Report/API consumer
 
     C->>N: TLS + HTTP request
     N->>N: terminate TLS / proxy request
     N->>M: post-read and log phases
     M-)G: bounded JSON datagram
-    G->>G: normalize, profile, baseline, policy, store
-    G->>G: observe-only by default
-    G->>L: security log (optional)
-    L-.->F: explicit decision=deny only
-    F-.->W: explicit firewall action
+    G->>G: normalize, profile, baseline, store
     R->>G: GET /api/connections
     G-->>R: JSON observations
     R->>G: GET /api/report
@@ -120,8 +106,7 @@ The native module is active only inside Nginx's HTTP request lifecycle:
    copies bounded HTTP/TLS variables and sends one Unix datagram to Go.
 
 The module is therefore a request-to-collector handoff at the HTTP layer, not
-a TLS preread module, proxy, or policy engine. Go applies policy after the
-handoff, but the current policy remains observe-only by default.
+ a TLS preread module or proxy. It only hands observations to Go.
 `ngx_stream_ssl_preread_module` is a separate Nginx stream module used for
 passthrough SNI/ALPN routing.
 

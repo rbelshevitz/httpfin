@@ -37,9 +37,8 @@ curl -k --resolve inspector.example.test:8443:127.0.0.1 \
 ```
 
 Docker-режим выше предназначен для наблюдения и smoke-тестов. Для production
-с Fail2ban используйте отдельный host/systemd-режим: Nginx и `httpfin` работают
-как службы хоста, security-log хранится на хосте, а Fail2ban управляет его
-firewall.
+используйте отдельный host/systemd-режим: Nginx и `httpfin` работают как службы
+хоста, а socket и права доступа управляются systemd.
 
 Готовые заготовки:
 
@@ -68,9 +67,8 @@ sudo systemctl restart nginx
 ```
 
 Если в системе используется `www-data`, замените имя пользователя в команде.
-Перед включением Fail2ban сначала проверьте `/healthz`, `/api/connections`,
-права на `/run/httpfin/events.sock` и появление строк в
-`/var/log/httpfin/security.log`.
+Сначала проверьте `/healthz`, `/api/connections`, права на
+`/run/httpfin/events.sock` и появление новых наблюдений.
 
 ## Что проверять после деплоя
 

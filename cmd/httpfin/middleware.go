@@ -6,8 +6,6 @@ import (
 	"httpfin/internal/baseline"
 	"httpfin/internal/fingerprint"
 	"httpfin/internal/model"
-	"httpfin/internal/policy"
-	"httpfin/internal/securitylog"
 	"httpfin/internal/tlsinspect"
 	"net"
 	"net/http"
@@ -15,25 +13,22 @@ import (
 	"time"
 )
 
-func requestLogger(next http.Handler, store *model.Store, security *securitylog.Logger) http.Handler {
+func requestLogger(next http.Handler, store *model.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		recorder := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
-		_ = security.RecordRequest(fingerprint.ClientIP(r), r.URL.RequestURI(), recorder.status)
 		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/healthz" {
 			return
 		}
 		ua := r.UserAgent()
 		c := model.Connection{ID: fmt.Sprintf("http-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ElapsedMS: time.Since(started).Milliseconds(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), Status: recorder.status, Bytes: int64(recorder.bytes), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-http", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Unknown", Risk: "Info"}
 		store.Add(c)
-		decision := policy.Evaluate(c)
-		_ = security.RecordBotDecision(c.ClientIP, c.URL, decision.Action, decision.Reason, decision.Confidence)
 	})
 }
 
 // NewTLSHandler is the integration point for an HTTPS listener that terminates TLS in Go.
-func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.Observer, security *securitylog.Logger, clientBaseline *baseline.Set) http.Handler {
+func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.Observer, clientBaseline *baseline.Set) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		ua := r.UserAgent()
@@ -52,10 +47,7 @@ func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.O
 		writer := &captureWriter{ResponseWriter: w, c: &c}
 		next.ServeHTTP(writer, r)
 		c.ElapsedMS = time.Since(started).Milliseconds()
-		_ = security.RecordRequest(fingerprint.ClientIP(r), r.URL.RequestURI(), c.Status)
 		store.Add(c)
-		decision := policy.Evaluate(c)
-		_ = security.RecordBotDecision(c.ClientIP, c.URL, decision.Action, decision.Reason, decision.Confidence)
 	})
 }
 

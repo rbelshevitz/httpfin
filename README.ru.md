@@ -1,4 +1,4 @@
-# httpfin — инспектор отпечатка HTTP-клиента
+# httpfin: инспектор отпечатка HTTP-клиента
 
 [![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Лицензия](https://img.shields.io/badge/license-MIT-2ea44f?logo=opensourceinitiative&logoColor=white)](LICENSE)
@@ -12,13 +12,11 @@
 собирает доступные в точке наблюдения данные HTTP, TLS/SNI/ALPN и User-Agent,
 а затем предоставляет JSON API, UI и отчёт в стиле Squid.
 
-Это инструмент наблюдения перед API: он собирает признаки клиента, строит
-отчёт и рассчитан на последующее подключение внешнего контура WAF, policy-
-сервиса или Fail2ban. Заготовка Fail2ban есть, но полная цепочка блокировки для
-Nginx-сценария пока не завершена. Сам по себе `httpfin` не является системой
-аутентификации и в штатном режиме не блокирует запросы. `curl-impersonate` используется только как
-генератор эталонного трафика; его профили могут устаревать. Проект публикуется и сопровождается под
-GitHub-аккаунтом [`lwthiker`](https://github.com/lwthiker).
+Это инструмент наблюдения перед API: он собирает признаки клиента и строит
+понятный отчёт. Сам по себе `httpfin` не является системой аутентификации и не
+блокирует запросы. `curl-impersonate` используется только как генератор
+эталонного трафика; его профили могут устаревать. Проект публикуется и
+сопровождается под GitHub-аккаунтом [`lwthiker`](https://github.com/lwthiker).
 
 ## Быстрый запуск
 
@@ -59,12 +57,8 @@ curl -k --resolve inspector.example.test:8443:127.0.0.1 \
 Тестовый entrypoint создаёт короткоживущий self-signed сертификат. В production
 настоящие сертификат и ключ нужно монтировать в Nginx как секреты только для
 чтения. Если TLS завершается в Nginx, сборщику Go не нужен доступ к закрытому
-ключу. Этот Compose-режим предназначен для наблюдения и smoke-тестов; Fail2ban
-и доступ к firewall хоста в него не входят.
-
-Для host/systemd-режима с отдельным security-log и Fail2ban см. заготовки
-[`deploy/systemd/httpfin.service`](deploy/systemd/httpfin.service) и
-[`docs/DEVOPS_RUNBOOK.ru.md`](docs/DEVOPS_RUNBOOK.ru.md).
+ключу. Этот Compose-режим предназначен для наблюдения и smoke-тестов. Он не
+меняет трафик приложения и состояние firewall хоста.
 
 ## Как работает интеграция с Nginx
 
@@ -110,7 +104,7 @@ mismatch браузера.
 - проверка TLS termination, SNI, ALPN и исходного IP-адреса;
 - поиск сетевых регрессий после обновления Nginx, OpenSSL, браузера или SDK;
 - временная шкала инцидента для DevOps, API QA и команд безопасности;
-- подготовка данных для внешнего WAF, policy-сервиса или Fail2ban.
+- подготовка повторяемого отчёта для инцидента, rollout или QA-проверки.
 
 Подробные материалы:
 
@@ -119,7 +113,6 @@ mismatch браузера.
 - [`docs/NONTECHNICAL.ru.md`](docs/NONTECHNICAL.ru.md) — инструкция для сотрудников и API-тестировщиков
 - [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md)
 - [`docs/WIRE_OBSERVER.ru.md`](docs/WIRE_OBSERVER.ru.md)
-- [`docs/FAIL2BAN.ru.md`](docs/FAIL2BAN.ru.md)
 - [`docs/openapi.yaml`](docs/openapi.yaml)
 - [`TODO.ru.md`](TODO.ru.md)
 

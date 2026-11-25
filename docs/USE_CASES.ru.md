@@ -43,7 +43,8 @@ http.ListenAndServeTLS(":8443", "server.crt", "server.key", handler)
 
 ## 3. Проверка заявленного браузера
 
-Классический сигнал аномалии — User-Agent говорит «Chrome», а TLS/ALPN/HTTP/2 похожи на generic HTTP client. Это не повод блокировать запрос автоматически, но хороший повод пометить его как `Review` и проверить endpoint, rate и auth-контекст.
+Сравнение User-Agent с TLS, ALPN и HTTP/2 помогает заметить изменение сетевого
+поведения клиента и проверить его по журналам API.
 
 Сценарий:
 
@@ -52,7 +53,6 @@ http.ListenAndServeTLS(":8443", "server.crt", "server.key", handler)
 3. Сравнить профиль, JA3/JA4, ALPN, HTTP/2 и UA consistency.
 4. Проверить, одинаково ли ведут себя `/login`, `/token`, `/download` и чувствительные API-методы.
 
-Такой подход соответствует практикам anti-bot: сначала использовать пассивные network signals, а browser-side telemetry подключать только когда это необходимо.
 
 ## 4. Эталонные тесты с curl-impersonate
 
@@ -66,7 +66,9 @@ curl_safari15_5 --compressed -v https://inspector.example.test/fixture
 
 После обновления Nginx, OpenSSL, HTTP/2 proxy или `curl-impersonate` сравнить экспорт `/api/report`. Изменение fingerprint не всегда означает поломку, но его нужно зафиксировать как изменение сетевого поведения.
 
-Важно: baseline привязывается к версии. Храним `profile`, `browser_version`, `curl_impersonate_version`, `checked_at`, `source` и `status`. Новый Chrome или новый wrapper может законно изменить JA3/JA4, поэтому сравнение должно показывать `mismatch`/`unknown`, а не автоматически объявлять клиента подозрительным.
+Важно: baseline привязывается к версии. Новый Chrome или новый wrapper может
+законно изменить JA3/JA4, поэтому сравнение показывает `mismatch` или `unknown`
+как изменение данных, а не как вердикт о клиенте.
 
 ## 5. Nginx reverse proxy и потеря данных
 
@@ -144,7 +146,8 @@ curl -sS http://127.0.0.1:8080/api/report > incident-2026-11-25.txt
 - Сигнатуры могут совпадать у многих клиентов и могут меняться после обновления браузера.
 - Прокси и TLS termination могут скрыть или изменить признаки исходного клиента.
 - IP не равен устройству: NAT, VPN и мобильные сети меняют картину.
-- Не храните raw fingerprint дольше, чем нужно расследованию; для anti-bot лучше хешировать/усекать значения и ограничивать срок хранения.
+- Не храните raw fingerprint дольше, чем нужно расследованию; ограничивайте срок
+  хранения и объём данных.
 - Для high-value операций используйте auth, session binding и rate limits, а не только fingerprint.
 
 ## 9. Нормативная модель протокола
@@ -166,8 +169,6 @@ JA3/JA4 не являются заменой RFC-модели и не должн
 - [curl-impersonate Quick Start](https://curl-impersonate.readthedocs.io/en/latest/quick_start.html) — запуск wrapper profiles;
 - [NGINX log module](https://nginx.org/en/docs/http/ngx_http_log_module.html) — `log_format`, JSON escaping и request timing;
 - [NGINX ssl_preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html) — SNI/ALPN из ClientHello без termination;
-- [OWASP Bot Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Bot_Management_and_Anti-Automation_Cheat_Sheet.html) — passive network signals и privacy guidance;
-- [AWS client identification guidance](https://docs.aws.amazon.com/prescriptive-guidance/latest/bot-control/client-identification-controls.html) — практические сценарии TLS/device fingerprinting;
 - [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) — исходная спецификация TLS 1.3, заменённая RFC 9846;
 - [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849) — Encrypted ClientHello;
 - [`ARCHITECTURE.ru.md`](ARCHITECTURE.ru.md) — расшифровка JA3/JA3S/JA4/JA4H и диаграммы границ наблюдения;

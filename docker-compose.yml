@@ -6,7 +6,6 @@ services:
         NGINX_VERSION: "1.28.3"
         ALPINE_VERSION: "3.23"
     environment:
-      httpfin_security_log: ${HTTPFIN_SECURITY_LOG:-}
       httpfin_test_endpoint: ${HTTPFIN_TEST_ENDPOINT:-0}
     ports:
       - "8443:8443"

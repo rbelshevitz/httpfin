@@ -1,4 +1,4 @@
-# httpfin — Client Fingerprint Inspector
+# httpfin: Client Fingerprint Inspector
 
 [![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License](https://img.shields.io/badge/license-MIT-2ea44f?logo=opensourceinitiative&logoColor=white)](LICENSE)
@@ -12,7 +12,8 @@
 request, TLS/SNI/ALPN and User-Agent data available at the observation point,
 then produces a JSON API, UI and Squid-style report.
 
-It is an evidence tool, not an authentication system or an automatic blocker.
+It is an evidence tool, not an authentication system and it does not block
+requests.
 `curl-impersonate` is used only as a reference traffic generator; its profiles
 can become outdated. The upstream project is maintained under the GitHub account
 [`lwthiker`](https://github.com/lwthiker).
@@ -55,8 +56,8 @@ curl -k --resolve inspector.example.test:8443:127.0.0.1 \
 The example entrypoint creates a short-lived self-signed certificate. In
 production, mount the real certificate and key into Nginx as read-only secrets.
 The Go collector does not need the private key when Nginx terminates TLS. This
-Compose mode is for observation and smoke tests; Fail2ban and host firewall
-access are deliberately outside it.
+Compose mode is for observation and smoke tests. It does not change application
+traffic or host firewall state.
 
 ## How the Nginx integration works
 
@@ -101,7 +102,7 @@ data; it is not a browser mismatch.
 - verify TLS termination, SNI, ALPN and source-IP handling;
 - detect network regressions after Nginx, OpenSSL, browser or SDK updates;
 - build an incident timeline for DevOps, API QA and security teams;
-- provide evidence to an external WAF, policy service or Fail2ban workflow.
+- provide a repeatable evidence artifact for an incident, rollout or QA run.
 
 Detailed runbooks and examples:
 
@@ -109,7 +110,6 @@ Detailed runbooks and examples:
 - [`docs/DEVOPS_RUNBOOK.md`](docs/DEVOPS_RUNBOOK.md)
 - [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md)
 - [`docs/WIRE_OBSERVER.md`](docs/WIRE_OBSERVER.md)
-- [`docs/FAIL2BAN.md`](docs/FAIL2BAN.md)
 - [`docs/openapi.yaml`](docs/openapi.yaml)
 - [`TODO.md`](TODO.md)
 

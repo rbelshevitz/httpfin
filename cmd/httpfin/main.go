@@ -16,8 +16,6 @@ import (
 	"httpfin/internal/fingerprint"
 	"httpfin/internal/ingest"
 	"httpfin/internal/model"
-	"httpfin/internal/policy"
-	"httpfin/internal/securitylog"
 	"httpfin/internal/tlsinspect"
 )
 
@@ -33,19 +31,10 @@ func main() {
 	if err != nil {
 		log.Printf("baseline disabled: %v", err)
 	}
-	security, err := securitylog.New(os.Getenv("httpfin_security_log"))
-	if err != nil {
-		log.Printf("cannot start security log: %v", err)
-		return
-	}
-	defer security.Close()
 	nginxEventHandler := func(c model.Connection) {
 		c.DetectedProfile = fingerprint.ProfileFromUA(c.UserAgent)
 		c = clientBaseline.Observe(c)
 		store.Add(c)
-		_ = security.RecordRequest(c.ClientIP, c.URL, c.Status)
-		decision := policy.Evaluate(c)
-		_ = security.RecordBotDecision(c.ClientIP, c.URL, decision.Action, decision.Reason, decision.Confidence)
 	}
 	stopIngest, ingestHealthy, err := ingest.StartUnixDatagramWithHandler(os.Getenv("httpfin_socket"), store, nginxEventHandler)
 	if err != nil {
@@ -71,7 +60,7 @@ func main() {
 	errCh := make(chan error, 2)
 	plainServer := &http.Server{
 		Addr:              addr,
-		Handler:           requestLogger(mux, store, security),
+		Handler:           requestLogger(mux, store),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -91,7 +80,7 @@ func main() {
 			log.Printf("httpfin inspector listening on https://%s (SNI + ALPN capture enabled)", tlsAddr)
 			tlsServer = &http.Server{
 				Addr:              tlsAddr,
-				Handler:           NewTLSHandler(mux, store, observer, security, clientBaseline),
+				Handler:           NewTLSHandler(mux, store, observer, clientBaseline),
 				TLSConfig:         config,
 				ReadHeaderTimeout: 5 * time.Second,
 				ReadTimeout:       15 * time.Second,

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestWriteExplainsClientsBotSignalsAndFingerprintChanges(t *testing.T) {
+func TestWriteExplainsClientsAndFingerprintChanges(t *testing.T) {
 	rows := []model.Connection{
 		{ID: "new", Timestamp: time.Unix(2, 0).UTC(), ClientIP: "203.0.113.8", Method: "GET", URL: "/v1/data?token=secret&client_secret=also-secret&view=full", Status: 200, Protocol: "HTTP/2", TLSVersion: "TLS 1.3", ALPN: "h2", ClientHelloSig: "hello-new", JA3: "ja3-new", HTTP2Fingerprint: "h2-new", DetectedProfile: "Chrome-like", UserAgent: "Chrome", Risk: "Review", UAConsistency: "Mismatch", BaselineStatus: "mismatch", ReferenceProfile: "Chrome"},
 		{ID: "old", Timestamp: time.Unix(1, 0).UTC(), ClientIP: "203.0.113.8", Method: "GET", URL: "/v1/data", Status: 200, Protocol: "HTTP/2", TLSVersion: "TLS 1.2", ALPN: "h2", ClientHelloSig: "hello-old", JA3: "ja3-old", HTTP2Fingerprint: "h2-old", DetectedProfile: "Chrome-like"},
@@ -18,14 +18,12 @@ func TestWriteExplainsClientsBotSignalsAndFingerprintChanges(t *testing.T) {
 	Write(recorder, rows)
 	body := recorder.Body.String()
 	for _, expected := range []string{
-		"CLIENTS AND BOT SIGNALS",
+		"CLIENTS",
 		"203.0.113.8",
-		"suspected",
-		"not_suspected",
+		"mismatch",
 		"fingerprint_change: tls:TLS 1.2->TLS 1.3",
 		"ja3:ja3-old->ja3-new",
 		"%5BREDACTED%5D",
-		"insufficient independent signals",
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("report does not contain %q:\n%s", expected, body)
@@ -53,7 +51,7 @@ func TestWriteCreatesUsefulEmptyReport(t *testing.T) {
 	if recorder.Code != 200 {
 		t.Fatalf("got HTTP status %d", recorder.Code)
 	}
-	for _, expected := range []string{"Observations: 0", "CLIENTS AND BOT SIGNALS", "No observations yet."} {
+	for _, expected := range []string{"Observations: 0", "CLIENTS", "No observations yet."} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("empty report does not contain %q:\n%s", expected, body)
 		}

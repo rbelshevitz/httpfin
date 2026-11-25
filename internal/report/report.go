@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"httpfin/internal/fingerprint"
 	"httpfin/internal/model"
-	"httpfin/internal/policy"
 	"net/http"
 	"net/url"
 	"sort"
@@ -69,9 +68,8 @@ func writeSummary(w interface{ Write([]byte) (int, error) }, rows []model.Connec
 
 func writeClients(w interface{ Write([]byte) (int, error) }, rows []model.Connection) {
 	type client struct {
-		count                   int
-		latest                  model.Connection
-		suspected, notSuspected int
+		count  int
+		latest model.Connection
 	}
 	clients := make(map[string]*client)
 	for _, c := range rows {
@@ -82,32 +80,22 @@ func writeClients(w interface{ Write([]byte) (int, error) }, rows []model.Connec
 			clients[key] = entry
 		}
 		entry.count++
-		if policy.Evaluate(c).Action != "" {
-			entry.suspected++
-		} else {
-			entry.notSuspected++
-		}
 	}
 	keys := make([]string, 0, len(clients))
 	for key := range clients {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	fmt.Fprintln(w, "\nCLIENTS AND BOT SIGNALS")
+	fmt.Fprintln(w, "\nCLIENTS")
 	fmt.Fprintln(w, strings.Repeat("-", 118))
-	fmt.Fprintf(w, "%-28s %-8s %-18s %-16s %-12s %-12s\n", "CLIENT", "REQUESTS", "LATEST PROFILE", "BOT SIGNAL", "SUSPECTED", "NOT SUSPECTED")
+	fmt.Fprintf(w, "%-28s %-8s %-18s %-12s %-12s\n", "CLIENT", "REQUESTS", "LATEST PROFILE", "BASELINE", "EVIDENCE")
 	for _, key := range keys {
 		c := clients[key]
-		bot := "not_suspected"
-		if c.suspected > 0 {
-			bot = "suspected"
-		}
-		fmt.Fprintf(w, "%-28s %-8d %-18s %-16s %-12d %-12d\n", fingerprint.Truncate(key, 28), c.count, fingerprint.Truncate(unknown(c.latest.DetectedProfile), 18), bot, c.suspected, c.notSuspected)
+		fmt.Fprintf(w, "%-28s %-8d %-18s %-12s %-12s\n", fingerprint.Truncate(key, 28), c.count, fingerprint.Truncate(unknown(c.latest.DetectedProfile), 18), fingerprint.Truncate(comparisonStatus(c.latest), 12), evidenceState(c.latest))
 	}
 	if len(keys) == 0 {
 		fmt.Fprintln(w, "No observations yet.")
 	}
-	fmt.Fprintln(w, "Bot signal is observe-only. not_suspected means insufficient evidence, not proof of a human client.")
 }
 
 func writeObservation(w interface{ Write([]byte) (int, error) }, c model.Connection, previous *model.Connection) {
@@ -121,12 +109,6 @@ func writeObservation(w interface{ Write([]byte) (int, error) }, c model.Connect
 		unknown(c.ClientHelloSig), unknown(c.JA3), unknown(c.JA4), unknown(c.HTTP2Fingerprint))
 	fmt.Fprintf(w, "  declared: user_agent=%s profile=%s\n",
 		unknown(fingerprint.Truncate(c.UserAgent, 96)), unknown(c.DetectedProfile))
-	decision := policy.Evaluate(c)
-	botStatus, botReason := "not_suspected", "insufficient independent signals"
-	if decision.Action != "" {
-		botStatus, botReason = "suspected", decision.Reason
-	}
-	fmt.Fprintf(w, "  bot_signal: status=%s action=%s confidence=%.2f reason=%s\n", botStatus, unknown(decision.Action), decision.Confidence, botReason)
 	fmt.Fprintf(w, "  fingerprint_change: %s\n", fingerprintChanges(c, previous))
 	fmt.Fprintf(w, "  comparison: status=%s reference=%s/%s source=%s explanation=%s\n",
 		comparisonStatus(c), unknown(c.ReferenceProfile), unknown(c.ReferenceVersion), unknown(c.ReferenceSource), explanation(c))

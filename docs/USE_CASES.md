@@ -52,35 +52,6 @@ Store a baseline containing the client, library/browser version, Nginx/OpenSSL
 version and observation date. Re-run after upgrades and review drift instead
 of treating every change as abuse.
 
-## Security triage
-
-Correlate profile, User-Agent, transport signals, IP, endpoint and status with
-authentication, rate-limit and application data. A fingerprint is a useful
-signal, not proof of identity and not a standalone blocking rule.
-
-### Practical anti-bot workflow
-
-Use `httpfin` as an observation point, not as the component that blocks a
-request:
-
-1. **Collect:** record User-Agent, source address, request, status, timing, TLS
-   version, SNI and ALPN where the edge can see them.
-2. **Compare:** check the claimed browser profile against transport signals and
-   a baseline tied to a client/library version. A Chrome User-Agent with generic
-   transport behavior is a review signal, not proof of automation.
-3. **Enrich:** join the report with rate limits, authentication, session
-   behavior and application outcomes.
-4. **Review:** investigate one fingerprint across many addresses, repeated
-   401/403/429 responses, or unexpected profile drift.
-5. **Enforce elsewhere:** let a WAF, gateway or application policy choose a
-   challenge, throttle or block action. Keep `httpfin` read-only in the request
-   path.
-
-In the current release, the Nginx handoff carries request/TLS metadata but does
-not calculate JA3, JA4 or HTTP/2 fingerprints. Those require an external wire
-observer. The Nginx handoff also leaves the inferred profile as `Unknown`; the
-direct Go HTTPS mode can classify a declared User-Agent, but only heuristically.
-
 ## Protocol references
 
 - [RFC 6066 — SNI](https://www.rfc-editor.org/rfc/rfc6066)
