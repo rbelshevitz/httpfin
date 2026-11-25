@@ -6,10 +6,8 @@ policy in separate, explicit stages.
 
 ## Before expanding detection
 
-- [ ] Build the Nginx module against the pinned Nginx source and run the full
+- [x] Build the Nginx module against the pinned Nginx source and run the full
   container smoke test.
-- [ ] Run the pinned Docker build and full container smoke test on a host with a
-  Docker daemon.
 - [ ] Add fuzz tests for the C JSON builder and Go event decoder.
 - [ ] Add load tests for TLS handshakes, HTTP/2 requests and Unix datagrams.
 

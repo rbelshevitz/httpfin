@@ -16,8 +16,8 @@ writing field prefixes and the closing suffix. A long URI, host or User-Agent
 can therefore write past the stack buffer and crash or corrupt an Nginx worker.
 
 The working tree now uses a bounded builder that checks every append and returns
-`oversize` before writing beyond the buffer. A real Nginx source build and
-container smoke test are still required before release validation.
+`oversize` before writing beyond the buffer. The pinned Nginx 1.28.3 source build
+and container smoke test pass.
 
 ### P0/P1 — unbounded ClientHello map — fixed in working tree
 
@@ -85,4 +85,6 @@ go vet ./...
 ./tests/nginx-module-static.sh
 ```
 
-The container smoke test additionally requires an available Docker daemon.
+The container smoke test passed with the pinned Alpine 3.23/Nginx 1.28.3 image:
+Go build, `.so` compilation/loading, runtime library checks, TLS/SNI/ALPN and
+Unix-datagram delivery were all exercised.

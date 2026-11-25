@@ -15,8 +15,8 @@ socket в недоверенной среде.
 записать данные за пределами stack buffer и уронить worker.
 
 Теперь используется bounded builder: он проверяет каждую операцию и возвращает
-`oversize` до выхода за границу. Перед выпуском всё равно нужна реальная сборка
-модуля из исходников Nginx и container smoke test.
+`oversize` до выхода за границу. Сборка Nginx 1.28.3 из исходников и container
+smoke test для закреплённого Alpine 3.23 прошли.
 
 ### P0/P1 — неограниченная map ClientHello — исправлено в рабочем дереве
 
@@ -87,4 +87,6 @@ go vet ./...
 ./tests/nginx-module-static.sh
 ```
 
-Container smoke дополнительно требует доступного Docker daemon.
+Container smoke test прошёл на закреплённой связке Alpine 3.23/Nginx 1.28.3:
+проверены Go build, сборка и загрузка `.so`, runtime-библиотеки, TLS/SNI/ALPN и
+доставка через Unix datagram.

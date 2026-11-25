@@ -6,10 +6,8 @@
 
 ## Сначала — надёжность
 
-- [ ] Собрать Nginx-модуль под закреплённый исходный код Nginx и пройти полный
+- [x] Собрать Nginx-модуль под закреплённый исходный код Nginx и пройти полный
   container smoke test.
-- [ ] Выполнить pinned Docker build и полный container smoke test на хосте с
-  доступным Docker daemon.
 - [ ] Добавить fuzz-тесты для C-сборщика JSON и Go-декодера событий.
 - [ ] Добавить нагрузочные тесты для TLS handshakes, HTTP/2 и Unix datagram.
 
