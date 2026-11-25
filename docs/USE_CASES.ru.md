@@ -104,17 +104,24 @@ SNI — это имя, предложенное клиентом для выбо
 
 ## 6. Анализ отправок и проблем с прокси
 
-httpfin можно использовать как controlled endpoint для исходящих отправок:
+`httpfin` можно временно назначить адресатом исходящего запроса. В этом
+сценарии он работает как тестовый приёмник: принимает запрос и показывает в
+отчёте, что реально отправил клиент — User-Agent, HTTP-версию, TLS/SNI/ALPN,
+статус и задержку. Это не proxy и не генератор исходящего трафика.
 
 ```bash
 httpfin_addr=:8080 go run ./cmd/httpfin
 
 # в другом окне
-curl -H 'X-Test-Case: plain-curl' http://127.0.0.1:8080/echo
-curl_chrome116 -H 'X-Test-Case: chrome-profile' http://127.0.0.1:8080/echo
+curl -H 'X-Test-Case: plain-curl' http://127.0.0.1:8080/healthz
+curl_chrome116 -H 'X-Test-Case: chrome-profile' http://127.0.0.1:8080/healthz
+curl -sS http://127.0.0.1:8080/api/report > outgoing-report.txt
 ```
 
-Для каждого варианта сравниваются HTTP protocol, User-Agent, response status, latency и размер ответа. Это помогает понять, где меняется запрос: в SDK, прокси, ingress, TLS termination или upstream.
+Для каждого варианта сравниваются HTTP protocol, User-Agent, response status,
+latency и размер ответа. Это помогает понять, где меняется запрос: в SDK,
+прокси, ingress, TLS termination или upstream. Для проверки TLS/SNI направьте
+те же запросы на HTTPS listener и используйте `--resolve`.
 
 ## 7. Incident triage
 

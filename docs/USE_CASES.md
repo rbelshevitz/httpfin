@@ -20,6 +20,25 @@ what was actually received; it does not claim that a User-Agent is genuine.
 Compare direct and proxied requests to find changes in source address, SNI,
 ALPN, HTTP version, `Host`, `Forwarded`, User-Agent and timing.
 
+## Outgoing request inspection
+
+Temporarily point an SDK, webhook sender, job or integration test at
+`httpfin`. It acts as a controlled test receiver: the report shows what the
+sender actually emitted, including User-Agent, HTTP version, TLS/SNI/ALPN when
+available, status and timing. It is not an outbound proxy and does not create
+traffic by itself.
+
+```bash
+go run ./cmd/httpfin
+
+# from another terminal
+curl -H 'X-Test-Case: plain-curl' http://127.0.0.1:8080/healthz
+curl -fsS http://127.0.0.1:8080/api/report > outgoing-report.txt
+```
+
+For TLS/SNI testing, use the HTTPS listener or the Docker Nginx endpoint and
+send the request with the expected hostname.
+
 ## TLS and SNI troubleshooting
 
 Use direct HTTPS mode when the ClientHello is needed. Use Nginx stream
