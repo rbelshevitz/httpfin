@@ -93,6 +93,24 @@ and [Nginx-specific Fail2ban examples](https://fail2ban.dev/guides/nginx/).
 - [ ] Create a replay fixture set from ordinary browsers, SDKs, automation and
   known-good partner clients.
 
+## Baseline updater safety
+
+- [ ] Keep `candidate` and `active` baselines in separate files; the updater
+  must never overwrite the active file directly.
+- [ ] Require schema validation, a minimum number of repeated captures, and a
+  human-reviewed diff before activation.
+- [ ] Store browser version, OS, runner image digest, capture time, source, and
+  tool version with every baseline entry.
+- [ ] Reject sudden large changes in TLS/HTTP2 signatures unless an operator
+  explicitly approves the change.
+- [ ] Keep the previous active baseline for immediate rollback and write an
+  audit record for every activation.
+- [ ] Treat unknown or stale baselines as `unknown`/`observe`, never as `deny`.
+- [ ] Run browser capture in an isolated, pinned CI environment without
+  production credentials, cookies, or private network access.
+- [ ] Verify that the updater cannot inject arbitrary IPs, reason codes, or
+  Fail2ban `decision=deny` events.
+
 ## Operator experience
 
 - [ ] Add a report section that explains each decision reason in plain language.
