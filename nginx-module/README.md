@@ -104,8 +104,10 @@ hook.
 For TLS passthrough, use NGINX `stream` plus
 `ssl_preread on;`. The built-in stream module exposes
 `$ssl_preread_server_name`, `$ssl_preread_alpn_protocols`, and
-`$ssl_preread_protocol`. Route or log those values separately, or add a future
-stream companion module. An HTTP module cannot see a passthrough connection.
+`$ssl_preread_protocol`. The last value is the highest TLS version advertised
+by the client in ClientHello, not the version negotiated by the downstream
+TLS endpoint. Route or log those values separately, or add a future stream
+companion module. An HTTP module cannot see a passthrough connection.
 
 HTTP/2 frame/settings fingerprints require an HTTP/2-aware observer. They are
 not reconstructed from the ordinary HTTP request phase in this module.
@@ -147,8 +149,13 @@ audit records are required.
 - TLS preread/SNI/ALPN: <https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html>
 - TLS stream variables: <https://nginx.org/en/docs/stream/ngx_stream_ssl_module.html>
 - TLS 1.3: <https://www.rfc-editor.org/rfc/rfc9846>
+- TLS 1.3 original specification: <https://www.rfc-editor.org/rfc/rfc8446>
 - SNI: <https://www.rfc-editor.org/rfc/rfc6066>
 - ALPN: <https://www.rfc-editor.org/rfc/rfc7301>
 - HTTP/2: <https://www.rfc-editor.org/rfc/rfc9113>
 - HTTP semantics: <https://www.rfc-editor.org/rfc/rfc9110>
+- Encrypted ClientHello: <https://www.rfc-editor.org/rfc/rfc9849>
+- Forwarded: <https://www.rfc-editor.org/rfc/rfc7239>
+- JA3 reference: <https://github.com/salesforce/ja3>
+- JA4+ reference: <https://github.com/FoxIO-LLC/ja4>
 - curl-impersonate: <https://github.com/lwthiker/curl-impersonate>

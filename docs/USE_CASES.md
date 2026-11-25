@@ -46,3 +46,9 @@ signal, not proof of identity and not a standalone blocking rule.
 - [RFC 9113 — HTTP/2](https://www.rfc-editor.org/rfc/rfc9113)
 - [RFC 9110 — HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110)
 - [RFC 7239 — Forwarded](https://www.rfc-editor.org/rfc/rfc7239)
+- [RFC 9846 — TLS 1.3](https://www.rfc-editor.org/rfc/rfc9846)
+- [RFC 8446 — original TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446)
+- [RFC 9849 — Encrypted ClientHello](https://www.rfc-editor.org/rfc/rfc9849)
+
+For the meaning and limitations of JA3, JA3S, JA4 and JA4H, see
+[`ARCHITECTURE.md`](ARCHITECTURE.md).

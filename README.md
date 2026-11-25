@@ -56,6 +56,13 @@ to make a request look browser-like. Exact JA3/JA4 and HTTP/2 fingerprints
 require raw ClientHello and HTTP/2 connection-frame observation; they cannot be
 reconstructed honestly from one post-termination HTTP request.
 
+`JA3` is a normalized TLS ClientHello fingerprint; `JA3S` describes the server
+response. `JA4` is a newer FoxIO TLS fingerprint, while `JA4H` describes HTTP
+client behavior and `JA4+` names the wider family. These are grouping signals,
+not RFC protocol fields or client authentication. The current `httpfin` module
+does not calculate them; it can display values supplied by an external wire
+observer.
+
 ## Nginx integration
 
 The repository contains a native dynamic Nginx module. It is intentionally
@@ -72,9 +79,11 @@ client → Nginx / ingress → application
 
 Read [`nginx-module/README.md`](nginx-module/README.md),
 [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md), and
-[`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md) for module
+[`docs/INTEGRATION_FORMAT.md`](docs/INTEGRATION_FORMAT.md) for module
 build compatibility, TLS certificate placement, passthrough, and operational
 failure modes. The OpenAPI description is in [`docs/openapi.yaml`](docs/openapi.yaml).
+The observation boundaries and data flows are shown in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Why the report is useful
 
@@ -165,6 +174,10 @@ runbooks, [`docs/USE_CASES.md`](docs/USE_CASES.md) for practical examples, and
 - [RFC 7301 — ALPN](https://www.rfc-editor.org/rfc/rfc7301);
 - [RFC 9113 — HTTP/2](https://www.rfc-editor.org/rfc/rfc9113);
 - [RFC 9110 — HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110);
+- [RFC 7239 — Forwarded](https://www.rfc-editor.org/rfc/rfc7239);
+- [RFC 9849 — Encrypted ClientHello](https://www.rfc-editor.org/rfc/rfc9849);
+- [RFC 9846 — current TLS 1.3](https://www.rfc-editor.org/rfc/rfc9846);
+- [RFC 8446 — original TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446);
 - [Nginx dynamic modules](https://docs.nginx.com/nginx/admin-guide/dynamic-modules/);
 - [Nginx SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html).
 

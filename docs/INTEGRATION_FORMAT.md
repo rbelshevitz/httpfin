@@ -85,9 +85,15 @@ nginx -t
 See [Nginx configure](https://nginx.org/en/docs/configure.html),
 [dynamic modules](https://docs.nginx.com/nginx/admin-guide/dynamic-modules/),
 [SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html),
-and [RFC 6066](https://www.rfc-editor.org/rfc/rfc6066),
-[RFC 7301](https://www.rfc-editor.org/rfc/rfc7301), and
-[RFC 9113](https://www.rfc-editor.org/rfc/rfc9113).
+and the complete [observation model](ARCHITECTURE.md). Protocol sources are
+[RFC 9846](https://www.rfc-editor.org/rfc/rfc9846) and historical
+[RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) for TLS 1.3,
+[RFC 6066](https://www.rfc-editor.org/rfc/rfc6066) for SNI,
+[RFC 7301](https://www.rfc-editor.org/rfc/rfc7301) for ALPN,
+[RFC 9113](https://www.rfc-editor.org/rfc/rfc9113) for HTTP/2,
+[RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) for HTTP semantics,
+[RFC 7239](https://www.rfc-editor.org/rfc/rfc7239) for `Forwarded`, and
+[RFC 9849](https://www.rfc-editor.org/rfc/rfc9849) for Encrypted ClientHello.
 
 ## Validation
 

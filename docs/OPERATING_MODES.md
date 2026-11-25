@@ -7,7 +7,7 @@ Choose the observation point before deploying `httpfin`.
 | Plain HTTP API debugging | none | no | HTTP request/response | SDK and API debugging |
 | Direct HTTPS listener | Go/httpfin | yes | TLS, SNI, ALPN, HTTP | ClientHello experiments |
 | Nginx TLS termination | Nginx | no | Nginx TLS fields + HTTP handoff | production ingress |
-| Nginx TLS passthrough | downstream service | no for Nginx | SNI, ALPN, TLS version | routing diagnostics |
+| Nginx TLS passthrough | downstream service | no for Nginx | SNI, offered ALPN, advertised TLS version | routing diagnostics |
 
 ## Direct HTTPS
 
@@ -47,8 +47,13 @@ capturing ClientHello before termination.
 ## TLS passthrough
 
 With `stream { ssl_preread on; }`, Nginx does not need a certificate. The
-downstream TLS service owns the certificate. This exposes SNI, ALPN, and TLS
-version, but not HTTP method, URL, headers, status, or User-Agent.
+downstream TLS service owns the certificate. This exposes SNI, the ALPN list,
+and the TLS version advertised in ClientHello, but not the negotiated TLS
+version or HTTP method, URL, headers, status, or User-Agent.
+
+`ssl_preread` observes ClientHello before TLS termination. Its protocol value
+is therefore a client offer, not proof of the version eventually negotiated by
+the downstream service.
 
 ## Practical team workflows
 
@@ -62,3 +67,15 @@ version, but not HTTP method, URL, headers, status, or User-Agent.
   OpenSSL version together so a transport change can be reproduced.
 
 The complete Russian runbook is in [`OPERATING_MODES.ru.md`](OPERATING_MODES.ru.md).
+The architecture diagrams are in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Protocol sources
+
+- [RFC 9846 — TLS 1.3](https://www.rfc-editor.org/rfc/rfc9846) and historical
+  [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446);
+- [RFC 6066 — SNI](https://www.rfc-editor.org/rfc/rfc6066);
+- [RFC 7301 — ALPN](https://www.rfc-editor.org/rfc/rfc7301);
+- [RFC 9113 — HTTP/2](https://www.rfc-editor.org/rfc/rfc9113);
+- [RFC 9110 — HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110);
+- [RFC 7239 — Forwarded](https://www.rfc-editor.org/rfc/rfc7239);
+- [RFC 9849 — Encrypted ClientHello](https://www.rfc-editor.org/rfc/rfc9849).

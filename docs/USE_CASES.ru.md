@@ -149,6 +149,7 @@ curl -sS http://127.0.0.1:8080/api/report > incident-2026-11-25.txt
 - HTTP/2 connection и binary framing — [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113). SETTINGS, порядок кадров и приоритеты могут быть полезными признаками, но это уже наблюдаемая реализация клиента, а не отдельный RFC fingerprint.
 - HTTP semantics — [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110): метод, target, status и поля запроса должны храниться отдельно от TLS-признаков.
 - Цепочка прокси — [RFC 7239](https://www.rfc-editor.org/rfc/rfc7239) (`Forwarded`). Доверять `Forwarded` или `X-Forwarded-For` можно только от явно доверенного proxy hop; иначе клиент может подделать исходный IP.
+- SNI — [RFC 6066](https://www.rfc-editor.org/rfc/rfc6066), а ограничения видимости имени при ECH — [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849).
 
 JA3/JA4 не являются заменой RFC-модели и не должны называться «идентификатором клиента». В коде это отражается отдельными полями `JA3`, `JA4`, `Reference*` и `BaselineStatus`.
 
@@ -160,4 +161,7 @@ JA3/JA4 не являются заменой RFC-модели и не должн
 - [NGINX ssl_preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html) — SNI/ALPN из ClientHello без termination;
 - [OWASP Bot Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Bot_Management_and_Anti-Automation_Cheat_Sheet.html) — passive network signals и privacy guidance;
 - [AWS client identification guidance](https://docs.aws.amazon.com/prescriptive-guidance/latest/bot-control/client-identification-controls.html) — практические сценарии TLS/device fingerprinting;
+- [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) — исходная спецификация TLS 1.3, заменённая RFC 9846;
+- [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849) — Encrypted ClientHello;
+- [`ARCHITECTURE.ru.md`](ARCHITECTURE.ru.md) — расшифровка JA3/JA3S/JA4/JA4H и диаграммы границ наблюдения;
 - [Squid logformat](https://www.squid-cache.org/Doc/config/logformat/) — поля и модель access report.

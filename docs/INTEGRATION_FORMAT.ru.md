@@ -239,11 +239,13 @@ go vet ./...
 ## Нормативные и практические источники
 
 - [RFC 9846 — TLS 1.3](https://www.rfc-editor.org/rfc/rfc9846) — актуальная редакция TLS 1.3;
+- [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) — исходная спецификация TLS 1.3;
 - [RFC 6066](https://www.rfc-editor.org/rfc/rfc6066) — SNI в TLS ClientHello;
 - [RFC 7301](https://www.rfc-editor.org/rfc/rfc7301) — ALPN;
 - [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113) — HTTP/2;
 - [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) — HTTP semantics;
 - [RFC 7239](https://www.rfc-editor.org/rfc/rfc7239) — `Forwarded` через proxy;
+- [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849) — Encrypted ClientHello;
 - [NGINX configure](https://nginx.org/en/docs/configure.html) — сборка и `--with-compat`;
 - [NGINX dynamic modules](https://docs.nginx.com/nginx/admin-guide/dynamic-modules/) — загрузка `.so`;
 - [NGINX HTTP log module](https://nginx.org/en/docs/http/ngx_http_log_module.html) — `log_format` и access log;

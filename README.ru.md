@@ -32,7 +32,11 @@ httpfin_tls_addr=:8443 \
 go run ./cmd/httpfin
 ```
 
-В этом режиме httpfin фиксирует TLS version, negotiated ALPN, предложенные клиентом ALPN, SNI и ClientHello signature. Точный JA3/JA4 будет отдельным parser-модулем: текущая Go-модель не подменяет стандартный fingerprint эвристическим хешем.
+В этом режиме httpfin фиксирует согласованную TLS version, negotiated ALPN,
+предложенные клиентом ALPN, SNI и локальную сводку ClientHello. Эта сводка не
+является JA3: она зависит от полей и порядка, которые отдаёт Go TLS API. Точный
+JA3/JA4 будет отдельным parser-модулем: текущая Go-модель не подменяет
+стандартный fingerprint эвристическим хешем.
 
 Для native Nginx-модуля можно включить Unix datagram ingest:
 
@@ -94,6 +98,13 @@ Chrome: User-Agent подделывается, а `curl-impersonate` как ра
 raw ClientHello и кадров HTTP/2; из одного запроса после TLS termination их
 восстановить нельзя.
 
+`JA3` — нормализованный fingerprint TLS ClientHello; `JA3S` описывает ответ
+сервера. `JA4` — более новый TLS fingerprint FoxIO, `JA4H` описывает поведение
+HTTP-клиента, а `JA4+` — название расширенного семейства. Это сигналы для
+группировки, а не поля RFC и не аутентификация клиента. Текущий модуль
+`httpfin` их не считает, но может показать значения, переданные внешним
+wire-observer.
+
 ## ⚡ Цели проекта
 
 `httpfin` нужен, чтобы быстро ответить на вопрос: «какой клиент реально
@@ -123,6 +134,7 @@ DevOps/SRE, API QA, backend-разработчика и security-команды.
 аутентификации.
 
 Подробные сценарии для DevOps/SRE, API-тестировщиков, backend и security находятся в [`docs/USE_CASES_TEAM.ru.md`](docs/USE_CASES_TEAM.ru.md). Режимы TLS, сертификаты и сборка модуля вне Docker описаны в [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md) и [`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md). Интерфейс Swagger/OpenAPI — [`docs/openapi.yaml`](docs/openapi.yaml).
+Схемы режимов наблюдения и потоков данных находятся в [`docs/ARCHITECTURE.ru.md`](docs/ARCHITECTURE.ru.md).
 
 Пример расширенного Nginx-лога:
 
@@ -154,7 +166,10 @@ access_log /var/log/nginx/httpfin.jsonl httpfin;
 
 Подробные пошаговые сценарии с командами находятся в [`docs/USE_CASES.ru.md`](docs/USE_CASES.ru.md): от отладки API-клиента и входящих запросов до анализа отправок через прокси и incident triage.
 
-Протокольные границы и RFC-разделение также описаны там: TLS 1.3 (RFC 9846), ALPN (RFC 7301), HTTP/2 (RFC 9113), HTTP semantics (RFC 9110) и proxy identity через `Forwarded` (RFC 7239).
+Протокольные границы и RFC-разделение также описаны там: TLS 1.3 (RFC 9846 и
+исторический RFC 8446), SNI (RFC 6066), ALPN (RFC 7301), HTTP/2 (RFC 9113),
+HTTP semantics (RFC 9110), `Forwarded` (RFC 7239) и Encrypted ClientHello
+(RFC 9849).
 
 ## Отчётность
 

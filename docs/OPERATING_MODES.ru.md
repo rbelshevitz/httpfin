@@ -11,7 +11,7 @@ ingress и приложением. Перед запуском нужно выб
 | Локальная отладка HTTP API | никто | нет | HTTP-запрос | проверить метод, URL, UA, статус |
 | `httpfin` принимает HTTPS напрямую | `httpfin`/Go | да | TLS, SNI, ALPN и HTTP | проверить настоящий клиентский handshake |
 | Nginx termination | Nginx | нет для Go | Nginx TLS-поля + HTTP handoff | production ingress и API troubleshooting |
-| Nginx `stream` passthrough | downstream-сервис | нет для Nginx | SNI, ALPN, TLS version без HTTP | проверить маршрутизацию до backend |
+| Nginx `stream` passthrough | downstream-сервис | нет для Nginx | SNI, предложенный ALPN, заявленная версия TLS | проверить маршрутизацию до backend |
 | тестовый контейнер | Nginx | генерируется автоматически | HTTPS/SNI/HTTP/2 | smoke-тест интеграции |
 
 ## 1. Отладка API без TLS
@@ -147,8 +147,9 @@ stream {
 Сертификат для Nginx не нужен: он только читает ClientHello. Сертификат нужен
 конечному `app:443`, потому что именно этот сервис завершает TLS.
 
-В passthrough доступны SNI, ALPN и версия TLS из ClientHello, но недоступны
-HTTP method, URL, headers, status и User-Agent. Поэтому это режим для
+В passthrough доступны SNI, список ALPN и версия TLS, заявленная в ClientHello,
+но недоступны согласованная версия TLS, HTTP method, URL, headers, status и
+User-Agent. Поэтому это режим для
 проверки маршрутизации и TLS-совместимости, а не для полного HTTP-отчёта.
 
 ## 5. Что проверять команде
@@ -183,6 +184,8 @@ curl -sS http://127.0.0.1:8080/api/connections
 
 ## Связанные документы
 
+- [`ARCHITECTURE.ru.md`](ARCHITECTURE.ru.md) — схемы режимов наблюдения и потока данных;
+
 - [`README.ru.md`](../README.ru.md) — быстрый старт;
 - [`DEVOPS_RUNBOOK.ru.md`](DEVOPS_RUNBOOK.ru.md) — эксплуатационная диагностика;
 - [`USE_CASES_TEAM.ru.md`](USE_CASES_TEAM.ru.md) — роли DevOps, QA, backend и security;
@@ -193,4 +196,6 @@ curl -sS http://127.0.0.1:8080/api/connections
 [RFC 7301](https://www.rfc-editor.org/rfc/rfc7301),
 [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113),
 [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) и
-[RFC 7239](https://www.rfc-editor.org/rfc/rfc7239).
+[RFC 7239](https://www.rfc-editor.org/rfc/rfc7239),
+[RFC 9849](https://www.rfc-editor.org/rfc/rfc9849), а также исторический
+[RFC 8446](https://www.rfc-editor.org/rfc/rfc8446).
