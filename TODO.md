@@ -1,59 +1,58 @@
 # httpfin roadmap
 
-The current product is a diagnostic observer. Its purpose is a readable report
-about HTTP/TLS paths and client fingerprint changes. It does not enforce access
-rules and does not block clients.
+## Product boundary
+
+`httpfin` is a diagnostic observer in front of an API. In the supported
+production topology, Nginx terminates TLS and the module sends a bounded HTTP
+event to Go. Go stores recent observations and produces a readable report.
+
+The product does not authenticate clients, block traffic, or act as a MITM
+proxy. It does not provide standard JA3/JA4 in the Nginx HTTP-module path.
 
 ## Done
 
-- [x] Production Nginx configurations, TLS termination, stream `ssl_preread`,
-  module compatibility, and Docker build guidance.
-- [x] Bounded in-memory observation store and browser profiles for desktop,
-  mobile, and WebView clients.
-- [x] Readable operator report with clients, fingerprint changes, evidence
-  state, observation point, baseline comparison, and secret redaction.
-- [x] Separate Docker smoke mode and host/systemd operation mode.
+- [x] Nginx termination and passthrough examples, dynamic-module compatibility,
+  Docker build guidance, and host/systemd deployment files.
+- [x] Bounded in-memory storage, browser profiles, baseline comparison, and
+  secret redaction.
+- [x] JSON API, UI, and readable report with clients, evidence, and fingerprint
+  changes.
+- [x] Docker smoke mode and host/systemd production mode.
 - [x] Integration, fuzz, restart, and race-detector coverage.
-- [x] Operations and non-technical QA documentation.
+- [x] Operations, QA, and non-technical documentation.
 
-## Near-term operations work
+## Next release
 
-- [ ] Loss accounting: agree on `received -> decoded -> stored -> dropped`,
-  expose it in diagnostic output, and document reconciliation with access logs.
-- [ ] Reliability checks for socket permission failures, datagram overflow, and
-  a slow Go consumer. Nginx must continue serving in each case.
-- [ ] Host deployment smoke test covering permissions, restart, health checks,
-  report download, and graceful shutdown.
+- [ ] Add event-loss accounting: `received -> decoded -> stored -> dropped`.
+  Show the result in diagnostic output and document reconciliation with the
+  Nginx access log.
+- [ ] Add repeatable reliability checks for socket permissions, datagram
+  overflow, a stopped collector, and a slow collector. Nginx must continue
+  serving requests in every case.
+- [ ] Run and document a host deployment check: certificate paths, permissions,
+  restart, health check, report download, and graceful shutdown.
 
-## Long-term tasks
+## Separate future experiment
 
-- [ ] Optional SQLite history for searching observations across restarts. Do not
-  enable it by default.
-- [ ] A separate wire observer or TLS-aware proxy for raw ClientHello, JA3/JA4,
-  and connection-level HTTP/2 data. This is a new deployment component, not an
-  extension of the current HTTP module.
-- [ ] TLS fingerprinting PoC under MIT: evaluate
-  [`psanford/tlsfingerprint`](https://github.com/psanford/tlsfingerprint). It can
-  wrap a Go `net.Listener`, read ClientHello before `tls.Server`, and provide
-  JA3/JA4 to the same request context. First use it in the direct Go HTTPS mode;
-  do not put it in front of the Nginx production path until certificate,
-  latency, HTTP/2, SNI, timeout and restart tests pass.
-- [ ] Proxy alternative under MIT: evaluate
-  [`mitmproxy`](https://github.com/mitmproxy/mitmproxy) only in a controlled
-  test network. Its transparent or reverse modes terminate TLS and generate
-  interception certificates, so clients must trust its CA. It is useful for a
-  lab or QA path, not a drop-in production edge for arbitrary public clients.
-- [ ] Do not select `elazarl/goproxy` as the production edge without a separate
-  maintenance and protocol review. It is an MIT HTTP proxy, but its age and
-  scope make it a fallback prototype rather than the default choice.
+- [ ] Test standard JA3/JA4 in a separate direct-Go TLS listener using the
+  MIT-licensed [`psanford/tlsfingerprint`](https://github.com/psanford/tlsfingerprint).
+  The listener would terminate TLS, read ClientHello before the handshake, and
+  pass the result into the report. This is a new input mode, not a change to
+  the current Nginx HTTP module.
+- [ ] Only if the direct listener is insufficient, evaluate a dedicated
+  reverse proxy or passive wire observer. A MITM proxy is not required by the
+  supported product topology.
+
+## Later, only if required
+
+- [ ] Optional SQLite history across restarts, with retention, redaction,
+  cleanup, disk-full handling, and recovery rules. Do not enable by default.
 - [ ] Automatic profile updates and distributed storage.
 
 ## Current constraints
 
-- The HTTP module works only after TLS termination. It does not see passthrough
-  traffic and cannot parse the original ClientHello.
-- The Unix datagram is a fast, best-effort handoff. If the collector is stopped
-  or overloaded, an event can be lost while the client request still succeeds.
-- Access logs are needed when every request must be accounted for. They provide
-  request records, while a future durable store would retain httpfin details.
+- The Nginx HTTP module runs after TLS termination and cannot parse the original
+  ClientHello or see passthrough HTTP traffic.
+- The Unix datagram is a fast, best-effort handoff. An event can be lost while
+  the client request still succeeds; access logs remain the request record.
 - Dynamic modules must match the Nginx version and libc used at runtime.
