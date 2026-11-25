@@ -32,6 +32,20 @@ rules and does not block clients.
 - [ ] A separate wire observer or TLS-aware proxy for raw ClientHello, JA3/JA4,
   and connection-level HTTP/2 data. This is a new deployment component, not an
   extension of the current HTTP module.
+- [ ] TLS fingerprinting PoC under MIT: evaluate
+  [`psanford/tlsfingerprint`](https://github.com/psanford/tlsfingerprint). It can
+  wrap a Go `net.Listener`, read ClientHello before `tls.Server`, and provide
+  JA3/JA4 to the same request context. First use it in the direct Go HTTPS mode;
+  do not put it in front of the Nginx production path until certificate,
+  latency, HTTP/2, SNI, timeout and restart tests pass.
+- [ ] Proxy alternative under MIT: evaluate
+  [`mitmproxy`](https://github.com/mitmproxy/mitmproxy) only in a controlled
+  test network. Its transparent or reverse modes terminate TLS and generate
+  interception certificates, so clients must trust its CA. It is useful for a
+  lab or QA path, not a drop-in production edge for arbitrary public clients.
+- [ ] Do not select `elazarl/goproxy` as the production edge without a separate
+  maintenance and protocol review. It is an MIT HTTP proxy, but its age and
+  scope make it a fallback prototype rather than the default choice.
 - [ ] Automatic profile updates and distributed storage.
 
 ## Current constraints
