@@ -95,6 +95,21 @@ and [Nginx-specific Fail2ban examples](https://fail2ban.dev/guides/nginx/).
 
 ## Baseline updater safety
 
+### Minimal optional updater MVP
+
+- [ ] Add one optional capture command that writes only `candidate.json`.
+- [ ] Use an external `curl-impersonate` profile as the first traffic source;
+  do not add browsers, Playwright, Node.js, or browser downloads to the core
+  Go image.
+- [ ] Add separate `validate` and `diff` operations before considering a
+  candidate for activation.
+- [ ] Keep activation as an explicit operator step; the updater must never
+  replace `active.json` or emit Fail2ban `decision=deny` automatically.
+- [ ] Start with one Chrome-like fixture and add other browser sources only
+  when a real team scenario needs them.
+- [ ] Keep the updater outside the `httpfin` runtime and make its failure
+  harmless to collection, reports, and API traffic.
+
 - [ ] Keep `candidate` and `active` baselines in separate files; the updater
   must never overwrite the active file directly.
 - [ ] Require schema validation, a minimum number of repeated captures, and a
