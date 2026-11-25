@@ -5,351 +5,107 @@
 [![Nginx](https://img.shields.io/badge/Nginx-1.28.3-009639?logo=nginx&logoColor=white)](Dockerfile)
 [![Alpine](https://img.shields.io/badge/Alpine-3.23-0D597F?logo=alpinelinux&logoColor=white)](Dockerfile)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
-[![Назначение](https://img.shields.io/badge/focus-HTTP%20%2F%20TLS%20diagnostics-6f42c1?logo=wireshark&logoColor=white)](docs/ARCHITECTURE.ru.md)
 
 > **Наблюдаем клиента. Объясняем путь запроса.**
 
-Проект использует upstream [curl-impersonate](https://github.com/lwthiker/curl-impersonate)
-как генератор контрольного трафика. Создатель и основной сопровождающий
-upstream-проекта публикуется под GitHub-аккаунтом
-[`lwthiker`](https://github.com/lwthiker); подтверждённое настоящее имя в
-публичном профиле не указано. Это важно учитывать: версии
-`curl-impersonate` и эталонные browser-like признаки могут устаревать вместе с
-браузерами, TLS-библиотеками и HTTP/2-реализациями.
+`httpfin` — диагностический сервис на Go для входящих HTTP-клиентов. Он
+собирает доступные в точке наблюдения HTTP-, TLS/SNI/ALPN- и User-Agent-данные,
+а затем строит JSON API, UI и Squid-style отчёт.
 
-Диагностический сервер на Go для пассивного анализа входящих HTTP-клиентов. `curl-impersonate` используется как генератор эталонных запросов: можно сравнивать обычный curl, `curl_chrome116`, настоящий браузер и другие клиентские библиотеки.
+Это инструмент наблюдения, а не система аутентификации и не автоматический
+блокировщик. `curl-impersonate` используется только как генератор эталонного
+трафика; его профили могут устаревать. Upstream поддерживает [`lwthiker`](https://github.com/lwthiker).
 
 ## Быстрый запуск
 
 ```bash
 go run ./cmd/httpfin
-# открыть http://127.0.0.1:8080
-```
-
-В другом терминале отправьте запрос и получите данные:
-
-```bash
-curl -v http://127.0.0.1:8080/healthz
+curl -fsS http://127.0.0.1:8080/healthz
 curl -fsS http://127.0.0.1:8080/api/connections
 curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
 ```
 
-Этот HTTP-режим не требует сертификата и подходит для отладки методов API,
-headers, status и timing. UI открывается по адресу
-`http://127.0.0.1:8080/`.
+UI: <http://127.0.0.1:8080/>.
 
-Эндпоинты:
+Основные endpoints:
 
-- `GET /api/connections` — последние наблюдения в JSON;
-- `GET /api/report` — отчёт в формате Squid-style TXT;
-- `GET /healthz` — health check.
+- `/api/connections` — последние наблюдения в JSON;
+- `/api/report` — отчёт Squid-style по запросу;
+- `/healthz` — health check;
+- `/` — локальный UI.
 
-HTTPS/SNI capture включается сертификатом:
+Отчёт создаётся при обращении и не сохраняется сервером в отдельную папку.
+При перенаправлении вывода файл создаётся в текущем каталоге shell, который
+запустил `curl`.
 
-```bash
-httpfin_tls_cert=./server.crt \
-httpfin_tls_key=./server.key \
-httpfin_tls_addr=:8443 \
-go run ./cmd/httpfin
-```
-
-В этом режиме httpfin фиксирует согласованную TLS version, negotiated ALPN,
-предложенные клиентом ALPN, SNI и локальную сводку ClientHello. Эта сводка не
-является JA3: она зависит от полей и порядка, которые отдаёт Go TLS API. Точный
-JA3/JA4 будет отдельным parser-модулем: текущая Go-модель не подменяет
-стандартный fingerprint эвристическим хешем.
-
-Для TLS, который завершает Go, можно подключить baseline-файл через
-`httpfin_baseline_file=/etc/httpfin/baseline.json`; пример находится в
-[`configs/baseline.example.json`](configs/baseline.example.json). Baseline
-только добавляет отметки к наблюдениям и сам по себе не блокирует клиентов.
-
-Границы wire observer и ограничения реализации TLS/HTTP2 описаны в
-[`docs/WIRE_OBSERVER.ru.md`](docs/WIRE_OBSERVER.ru.md).
-
-Для native Nginx-модуля можно включить Unix datagram ingest:
-
-```bash
-httpfin_socket=/run/httpfin/events.sock go run ./cmd/httpfin
-```
-
-Модуль отправляет один JSON event на запрос; отсутствие сокета не должно блокировать Nginx worker. Go принимает события, добавляет их в общее хранилище и отчёты.
-
-### Тестовый Docker-образ с Nginx и native-модулем
-
-Соберите и запустите полный стек:
+## Docker: Nginx + TLS + модуль
 
 ```bash
 docker compose up --build
-```
-
-Проверьте TLS, SNI и HTTP/2:
-
-```bash
 curl -k --resolve inspector.example.test:8443:127.0.0.1 \
   --http2 https://inspector.example.test:8443/healthz
-curl -k --resolve inspector.example.test:8443:127.0.0.1 \
-  https://inspector.example.test:8443/api/connections
 curl -k --resolve inspector.example.test:8443:127.0.0.1 \
   https://inspector.example.test:8443/api/report > httpfin-report.txt
 ```
 
-`--resolve` делает TLS SNI совпадающим с тестовым сертификатом и направляет
-запрос на localhost. `-k` нужен только из-за короткоживущего self-signed
-сертификата, который создаёт тестовый entrypoint.
+Тестовый entrypoint создаёт короткоживущий self-signed сертификат. В production
+настоящие сертификат и ключ нужно монтировать в Nginx как read-only secrets.
+Если TLS завершается в Nginx, Go collector не нужен доступ к private key.
 
-Если установлен `curl-impersonate`, сравните wrapper-профили:
-
-```bash
-curl_chrome116 --http2 https://inspector.example.test:8443/healthz
-curl_ff117 --http2 https://inspector.example.test:8443/healthz
-```
-
-Имена wrapper-ов и версии браузеров зависят от upstream-релиза. Используйте
-их как тестовые fixtures, а не как постоянную истину о браузерах.
-
-Проверка интеграции:
-
-```bash
-go test ./...
-go vet ./...
-./tests/nginx-module-static.sh
-./tests/container-smoke.sh
-```
-
-Последняя проверка требует доступного Docker daemon.
-
-## Архитектурный подход
-
-Практическая матрица режимов, сценарии для DevOps/API QA и правила работы с
-сертификатами находятся в [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md).
-Коротко: сертификат нужен только если TLS завершает сам `httpfin`; при
-termination в Nginx сертификат принадлежит Nginx, а при passthrough — конечному
-TLS-сервису.
-
-Рекомендуемая схема: Nginx остаётся data-plane — принимает TLS, проксирует запросы и ограничивает rate; Go становится collector/analysis-plane — собирает события, считает признаки, хранит историю и строит отчёты.
+## Как работает интеграция с Nginx
 
 ```text
 клиент → Nginx / ingress → приложение
              │
-             └─ access log + TLS/ALPN metadata → Go collector → UI / отчёты
+             └─ native module → Unix datagram → Go httpfin → отчёт/API
 ```
 
-### Границы Nginx-модуля
+Native-модуль работает в HTTP-жизненном цикле Nginx и отправляет одно
+ограниченное неблокирующее событие после появления финального status. Go
+принимает событие, нормализует, хранит и показывает его в отчёте.
 
-В репозитории уже есть рабочий native-модуль на C. Он остаётся тонким
-integration layer: снимает request/TLS-поля, создаёт request ID и передаёт
-ограниченное JSON-событие в Go через неблокирующий Unix datagram.
+Go не подключается обратно к модулю. Если Go недоступен, Nginx продолжает
+обслуживать запросы; событие является best-effort telemetry и может потеряться.
 
-Модуль не хранит историю, не считает JA3/JA4, не обращается к БД и не
-принимает тяжёлых policy-решений внутри worker. Анализ, baseline, risk,
-отчёты и UI остаются в Go. Это разделение позволяет обновлять правила и
-формат отчёта без пересборки Nginx.
+Модуль не разбирает raw ClientHello, не считает JA3/JA4 и не видит
+connection-level HTTP/2 SETTINGS. Для этих сигналов нужен direct Go TLS mode
+или отдельный wire-observer.
 
-Модуль включается после обработки TLS handshake самим Nginx: в
-`NGX_HTTP_POST_READ_PHASE` он создаёт контекст и request ID, а в
-`NGX_HTTP_LOG_PHASE`, после появления финального status, отправляет одно
-ограниченное событие в Go. Он не разбирает raw ClientHello и не участвует в
-`stream ssl_preread`.
+Подробности: [`nginx-module/README.md`](nginx-module/README.md) и
+[`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md).
 
-Проще говоря: Nginx принимает запрос, модуль копирует его короткое описание,
-а Go принимает это описание, сохраняет его и строит API, UI и отчёт. Если Go
-запускается напрямую, Nginx-модуль не нужен. Если Nginx работает с модулем,
-рядом с ним нужно запустить Go-исполняемый файл — это локальный приёмник
-событий.
+## Что может показать httpfin
 
-Связка односторонняя: Go при старте слушает `/run/httpfin/events.sock`, Nginx
-модуль отправляет туда один JSON datagram после каждого запроса. Go не
-подключается к модулю, и отдельный TCP-порт между ними не нужен. Если Go ещё
-не запущен, Nginx продолжает обслуживать запросы, но событие не попадёт в
-отчёт.
+- User-Agent, заявленный клиентом;
+- наблюдаемую или согласованную TLS version, SNI и ALPN;
+- HTTP method, target, status, timing, bytes и source address;
+- эвристические профили вроде `Chrome-like` и `Generic HTTP`;
+- JA3/JA4 и HTTP/2 только при наличии подходящего wire-observer.
 
-Для TLS без termination Nginx может использовать `ngx_stream_ssl_preread_module` и получить SNI/ALPN из ClientHello. Для точного JA3/JA4 нужен raw ClientHello или полноценный preread-парсер. После TLS termination нужно передать в Go хотя бы `$ssl_protocol`, `$ssl_alpn_protocol`, `$ssl_cipher`, `$ssl_server_name`, `$http_user_agent` и исходный IP.
+User-Agent и fingerprint — управляемые клиентом или имитируемые признаки.
+Пустой fingerprint означает отсутствие нужных данных в точке наблюдения, а не
+mismatch браузера.
 
-Отдельный preread-конфиг для SNI/ALPN находится в [`configs/nginx/httpfin-stream.conf`](configs/nginx/httpfin-stream.conf). Он не видит HTTP после TLS и потому используется для маршрутизации и stream-диагностики, а не для полного отчёта запроса.
+## Практическая польза
 
-### Что именно можно узнать о клиенте
+- сравнение curl, SDK, браузеров и `curl-impersonate`;
+- отладка API-клиентов, proxy, ingress и CDN-маршрутов;
+- проверка TLS termination, SNI, ALPN и source IP;
+- поиск сетевых регрессий после обновления Nginx, OpenSSL, браузера или SDK;
+- incident timeline для DevOps, API QA и security-команд;
+- подготовка данных для внешнего WAF, policy-сервиса или Fail2ban.
 
-`httpfin` фиксирует наблюдаемое поведение, а не удостоверяет личность
-клиента:
+Подробные материалы:
 
-- полный User-Agent, присланный клиентом;
-- согласованные TLS version, SNI и ALPN в точке, где доступен TLS-контекст;
-- список предложенных ALPN и сводный ClientHello signature при прямом HTTPS
-  listener `httpfin`;
-- метод, URI, статус, задержку, объём ответа и адрес источника;
-- эвристический профиль `Chrome-like`, `Firefox-like`, `Safari-like` или
-  `Generic HTTP`.
+- [`docs/USE_CASES_TEAM.ru.md`](docs/USE_CASES_TEAM.ru.md)
+- [`docs/DEVOPS_RUNBOOK.ru.md`](docs/DEVOPS_RUNBOOK.ru.md)
+- [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md)
+- [`docs/WIRE_OBSERVER.ru.md`](docs/WIRE_OBSERVER.ru.md)
+- [`docs/FAIL2BAN.ru.md`](docs/FAIL2BAN.ru.md)
+- [`docs/openapi.yaml`](docs/openapi.yaml)
+- [`TODO.ru.md`](TODO.ru.md)
 
-По User-Agent можно сказать, что клиент заявил себя как браузер или библиотека,
-а по совокупности TLS/ALPN/HTTP/2 — насколько это заявление согласуется с
-наблюдением. Нельзя честно утверждать, что запрос точно отправлен настоящим
-Chrome: User-Agent подделывается, а `curl-impersonate` как раз предназначен
-для browser-like TLS и HTTP/2. Точные JA3/JA4 и HTTP/2 fingerprint требуют
-raw ClientHello и кадров HTTP/2; из одного запроса после TLS termination их
-восстановить нельзя.
-
-`JA3` — нормализованный fingerprint TLS ClientHello; `JA3S` описывает ответ
-сервера. `JA4` — более новый TLS fingerprint FoxIO, `JA4H` описывает поведение
-HTTP-клиента, а `JA4+` — название расширенного семейства. Это сигналы для
-группировки, а не поля RFC и не аутентификация клиента. Текущий модуль
-`httpfin` их не считает, но может показать значения, переданные внешним
-wire-observer.
-
-## Цели проекта
-
-`httpfin` нужен, чтобы быстро ответить на вопрос: «какой клиент реально
-пришёл на этот endpoint и что изменилось по дороге?». Проект решает такие
-практические задачи:
-
-- отладка API-клиента: сравнить curl, SDK, Go/Java/Python-клиент,
-  браузер и `curl-impersonate`;
-- проверка ingress и reverse proxy: не потерялись ли IP, SNI, ALPN,
-  HTTP-версия, User-Agent и время запроса;
-- контроль TLS: какой протокол согласован, какой SNI выбран, какой ALPN
-  получил сервер и где именно завершается TLS;
-- поиск расхождений: заявлен Chrome, а набор сетевых признаков похож на
-  generic HTTP-клиент;
-- регрессионные проверки: изменился ли профиль после обновления Nginx,
-  OpenSSL, браузера, SDK или прокси;
-- диагностика отправок: сравнить прямой запрос, запрос через proxy,
-  ingress, CDN или service mesh;
-- incident triage: связать время, IP, endpoint, статус, User-Agent и
-  доступные fingerprint-сигналы в одной временной шкале;
-- подготовка данных для security-анализа и anti-bot правил без принятия
-  автоматического решения о блокировке внутри `httpfin`.
-
-Результат — наблюдаемая техническая картина запроса и понятный отчёт для
-DevOps/SRE, API QA, backend-разработчика и security-команды. `httpfin` не
-подменяет WAF, SIEM, полноценную браузерную телеметрию или систему
-аутентификации.
-
-Подробные сценарии для DevOps/SRE, API-тестировщиков, backend и security находятся в [`docs/USE_CASES_TEAM.ru.md`](docs/USE_CASES_TEAM.ru.md). Режимы TLS, сертификаты и сборка модуля вне Docker описаны в [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md) и [`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md). Интерфейс Swagger/OpenAPI — [`docs/openapi.yaml`](docs/openapi.yaml).
-Схемы режимов наблюдения и потоков данных находятся в [`docs/ARCHITECTURE.ru.md`](docs/ARCHITECTURE.ru.md).
-План развития anti-bot-привратника находится в [`TODO.ru.md`](TODO.ru.md).
-
-Пример расширенного Nginx-лога:
-
-```nginx
-log_format httpfin escape=json
-  '{"ts":"$time_iso8601",'
-  '"elapsed_ms":$request_time,'
-  '"client_ip":"$remote_addr",'
-  '"method":"$request_method",'
-  '"url":"$request_uri",'
-  '"status":$status,'
-  '"bytes":$bytes_sent,'
-  '"protocol":"$server_protocol",'
-  '"tls_version":"$ssl_protocol",'
-  '"alpn":"$ssl_alpn_protocol",'
-  '"user_agent":"$http_user_agent",'
-  '"request_id":"$request_id"}';
-
-access_log /var/log/nginx/httpfin.jsonl httpfin;
-```
-
-## Практические сценарии
-
-1. Диагностика клиента: сравнить curl, curl-impersonate, Go HTTP client и браузер по TLS, ALPN, User-Agent и HTTP/2.
-2. Anti-bot и abuse triage: обнаружить ситуацию, когда заявлен Chrome, но TLS/ALPN/HTTP/2 похожи на generic client.
-3. Расследование инцидента: связать один fingerprint с разными IP, URL-паттернами и временной шкалой.
-4. Проверка reverse proxy: убедиться, что ingress не теряет IP, protocol и request timing.
-5. Регрессионные тесты сетевого ПО: хранить эталонные fingerprints и сравнивать версии curl-impersonate, прокси и TLS-библиотек.
-
-Подробные пошаговые сценарии с командами находятся в [`docs/USE_CASES.ru.md`](docs/USE_CASES.ru.md): от отладки API-клиента и входящих запросов до анализа отправок через прокси и incident triage.
-
-Протокольные границы и RFC-разделение также описаны там: TLS 1.3 (RFC 9846 и
-исторический RFC 8446), SNI (RFC 6066), ALPN (RFC 7301), HTTP/2 (RFC 9113),
-HTTP semantics (RFC 9110), `Forwarded` (RFC 7239) и Encrypted ClientHello
-(RFC 9849).
-
-## Отчётность
-
-`/api/report` выдаёт два слоя:
-
-- access summary в стиле Squid: время, latency, клиент, статус, bytes, метод/URL, профиль и risk;
-- fingerprint details: TLS, ALPN, JA3, JA4, HTTP/2, User-Agent и consistency.
-
-Отпечаток — сигнал, а не доказательство личности клиента. Для блокировки нужно объединять его с rate, auth, IP reputation, поведением сессии и application logs.
-
-Отчёт ценен как диагностическая сводка: он связывает в одной строке время,
-клиент, запрос, протокол, TLS/SNI/ALPN, User-Agent, профиль и уровень риска.
-Это удобно для отладки API, проверки ingress, регрессионных тестов после
-обновления Nginx/OpenSSL/клиентской библиотеки и первичного incident triage.
-Пустое поле JA3/JA4/HTTP/2 означает, что текущая точка наблюдения не получила
-нужные данные, а не то, что запрос был ошибочным. Решения о блокировке нужно
-принимать только вместе с rate limits, аутентификацией, репутацией IP,
-поведением сессии и логами приложения.
-
-### Суть отчёта и как его создать
-
-`httpfin` строит отчёт по наблюдениям, уже принятым Go collector. Он не
-пересканирует трафик задним числом и не придумывает отсутствующие TLS-данные.
-Одна запись объединяет операционную сводку и доступные в точке наблюдения
-сигналы:
-
-- время, request ID, адрес источника, метод и URL;
-- статус, размер ответа и задержку;
-- HTTP protocol, TLS version, SNI и ALPN;
-- User-Agent, эвристический профиль и результат consistency;
-- JA3, JA4 и HTTP/2 — только если их передал подходящий wire-наблюдатель.
-
-JSON для CI, дашборда или дальнейшей обработки:
-
-```bash
-curl -fsS http://127.0.0.1:8080/api/connections > connections.json
-```
-
-Читаемый Squid-style TXT для incident ticket, rollout или результата API-теста:
-
-```bash
-curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
-```
-
-JSON удобен для автоматизации, TXT — для человека и приложенного к задаче
-артефакта. Пустое поле fingerprint означает, что точка наблюдения не получила
-нужные данные; его нельзя автоматически трактовать как несовпадение.
-
-### Где искать отчёт
-
-Отчёт создаётся по запросу. `httpfin` не пишет его в отдельный каталог и не
-запускает фоновый exporter. Получить его можно так:
-
-- открыть `/` и нажать **Export report**;
-- запросить `GET /api/report` в браузере или API-клиенте;
-- сохранить ответ перенаправлением shell.
-
-```bash
-curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
-```
-
-Файл появится в текущем каталоге shell, из которого запущен `curl`, а не внутри
-`httpfin`. В Docker он останется на хосте только если команда выполняется на
-хосте или настроен volume. Текущее хранилище находится в памяти: после
-перезапуска runtime-наблюдения исчезают, а встроенные demo-записи создаются
-заново. Для долговременной истории нужны access logs или внешняя БД.
-
-### Docker: что проверено и какие есть нюансы
-
-`Dockerfile` собирает Nginx 1.28.3 из исходников в Alpine 3.23 с
-`--with-compat` и динамическим модулем, а Go-бинарник собирает статически.
-Это даёт ровную совместимость Nginx и `.so`: модуль не берётся из одной
-системы, а Nginx — из другой. В runtime нужны OpenSSL, PCRE2 и zlib для самого
-Nginx; модуль не является самостоятельной программой и не должен запускаться
-через `ldd` как обычное приложение.
-
-В образе сертификат создаётся entrypoint-скриптом только для smoke-теста и
-имеет короткий срок действия. В рабочем окружении монтируйте сертификат и
-ключ в `/etc/nginx/certs` read-only, например через Docker/Kubernetes secret.
-При termination в Nginx ключ Go-процессу не нужен. При TLS passthrough
-сертификат находится у конечного backend. При прямом HTTPS на `httpfin`
-сертификат и ключ передаются через `httpfin_tls_cert` и `httpfin_tls_key`.
-
-Теги `alpine:3.23`, `golang:1.27-alpine` и версия Nginx заданы явно на уровне
-веток/версий, а `apk` получает актуальные security fixes этой ветки во время
-сборки. Для полностью воспроизводимого релиза дополнительно фиксируйте digest
-базовых образов и проводите регулярное обновление этих digest через CI.
-Перед выпуском запускайте:
+## Проверки разработки
 
 ```bash
 go test ./...
@@ -358,14 +114,6 @@ go vet ./...
 ./tests/container-smoke.sh
 ```
 
-### Baseline не должен быть вечным
+Последние две проверки требуют локальные зависимости сборки Nginx и Docker.
 
-Профиль `Chrome-like` — это классификация, а не обещание конкретной версии браузера. `curl-impersonate` и реальные браузеры меняются, поэтому baseline нужно хранить как данные: имя профиля, версию Chrome/Firefox/Safari, версию `curl-impersonate`, дату проверки, источник и статус (`matched`, `drifted`, `unknown`). При обновлении браузера сначала прогоняем контрольные запросы, фиксируем drift, затем обновляем baseline. Старые fingerprints не удаляем: они нужны для расследования исторического трафика.
-
-## Структура исходников
-
-- `cmd/httpfin` — запуск сервера и HTTP-маршруты;
-- `internal/model` — модели соединения и потокобезопасное хранилище;
-- `internal/fingerprint` — профиль клиента и утилиты отпечатка;
-- `internal/report` — Squid-style TXT-отчёт;
-- `internal/demo` — демонстрационные записи для UI.
+English documentation: [`README.md`](README.md).
