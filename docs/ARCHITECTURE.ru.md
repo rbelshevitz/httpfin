@@ -1,185 +1,122 @@
-# Архитектура httpfin и границы наблюдения
+# Как устроен httpfin
 
-Диаграммы показывают, какие данные доступны в каждом режиме. Важно разделять
-заявленные клиентом параметры, согласованные значения и HTTP-данные после TLS
-termination.
+`httpfin` ставят перед API, чтобы видеть запросы клиентов. Он не меняет запросы
+и ничего не блокирует. Обычно Nginx принимает HTTPS, а `httpfin` получает от
+него короткие записи о запросах.
 
-## Режимы развёртывания
-
-```mermaid
-flowchart LR
-    C[Клиент]
-    T[TLS ClientHello]
-    H[HTTP-запрос]
-    A[Приложение]
-
-    subgraph D[Прямой HTTPS]
-        G[Go httpfin\nTLS termination + HTTP]
-    end
-    subgraph N[Nginx termination]
-        X[Nginx\nTLS termination]
-        M[Native-модуль\nUnix datagram]
-        O[Go collector]
-    end
-    subgraph P[Passthrough]
-        S[Nginx stream\nssl_preread]
-        B[Конечный TLS-сервис]
-    end
-
-    C --> T
-    T --> G --> H --> A
-    T --> X --> M --> O
-    X --> H --> A
-    T --> S --> B --> H --> A
-```
-
-## Режимы запуска
+## Как проходит запрос
 
 ```mermaid
 flowchart LR
     C[Клиент]
-    subgraph D[Docker / smoke и наблюдение]
-        DN[Nginx + модуль + Go]
-        DA[API продукта]
-        DR[Отчёт / JSON API]
-        DN --> DA
-        DN --> DR
-    end
-    subgraph H[Host / systemd production]
-        HN[Nginx + модуль + Go]
-        HA[API продукта]
-        HN --> HA
-    end
-    C --> DN
-    C --> HN
+    N[Nginx\nзавершает TLS]
+    A[Тестируемое API]
+    M[HTTP-модуль httpfin]
+    G[Go-сборщик]
+    R[JSON API\nUI и отчёт]
+
+    C -->|TLS и HTTP| N
+    N -->|HTTP| A
+    N --> M
+    M -->|короткая Unix-датаграмма| G
+    G --> R
 ```
 
-Оба режима предназначены только для наблюдения. Docker удобен для smoke-тестов,
-а host/systemd даёт стабильные права на socket и штатный перезапуск в production.
+Nginx продолжает работать, даже если `httpfin` временно недоступен. Go хранит
+последние записи в памяти, смотрит на User-Agent и строит отчёт.
 
-## Что видно в каждом режиме
+## Где заканчивается TLS
 
-```mermaid
-flowchart TD
-    CH[ClientHello]
-    CH -->|прямой Go TLS| D1[заявленные версии\nзаявленный ALPN\nSNI\nполя ClientHello]
-    CH -->|Nginx ssl_preread| D2[SNI\nзаявленный ALPN\nзаявленная версия TLS]
-    CH -->|Nginx termination| D3[согласованный TLS\nвыбранный ALPN\nHTTP-запрос]
-    D3 --> D4[Исходный ClientHello\nне передаётся upstream автоматически]
-    H2[Кадры HTTP/2] --> D5[Только observer,\nпонимающий HTTP/2 connection]
+| Режим | Кто принимает HTTPS | Что видит `httpfin` | Чего не видит |
+|---|---|---|---|
+| Nginx завершает TLS | Nginx | HTTP, User-Agent, статус, IP, TLS, SNI и ALPN | исходного ClientHello, точного JA3/JA4 и HTTP/2 SETTINGS |
+| Прямой HTTPS | Go/httpfin | HTTP, TLS, SNI, ALPN и отдельные поля ClientHello | стандартных JA3/JA4 без отдельного расчёта |
+| TLS passthrough | конечный сервис | `httpfin` не видит HTTP-запрос | URL, заголовков, User-Agent и статуса |
+
+При passthrough Nginx может прочитать SNI и предложенный ALPN, чтобы выбрать
+сервер. Это отдельный режим Nginx, не часть HTTP-модуля `httpfin`.
+
+`ClientHello` — первое сообщение TLS от клиента. После завершения TLS оно
+теряется для обычного HTTP-модуля Nginx. Восстановить его из HTTP-запроса нельзя.
+
+## Что именно видит httpfin
+
+| Признак | Что видит текущий `httpfin` | Чего он не видит |
+|---|---|---|
+| Метод и путь | Да | — |
+| Статус ответа | Да | Полную сверку с каждым запросом без журнала Nginx |
+| IP-адрес | Да, тот, который видит Nginx | Настоящий адрес клиента при неверной настройке прокси |
+| User-Agent | Да, как его назвал клиент | Проверку, что клиент не соврал |
+| Профиль клиента | Да, примерный профиль по User-Agent | Надёжное определение браузера или бота |
+| Версия TLS, SNI, ALPN | Да, если TLS заканчивается в Nginx или Go | Эти данные в обычном HTTP и большая часть данных при passthrough |
+| Время и размер ответа | Да, в Go-режиме или журнале Nginx | В событии текущего Nginx-модуля |
+| Поля ClientHello | Да, только в прямом Go TLS-режиме | После завершения TLS в HTTP-модуле Nginx |
+| JA3 и JA4 | Нет | Нужна отдельная программа для чтения TLS |
+| Настройки и кадры HTTP/2 | Нет | Нужна отдельная программа для наблюдения за HTTP/2 |
+
+Пустое поле означает, что этот признак не удалось увидеть. Это не означает,
+что клиент «не совпал».
+
+## Из чего состоит система
+
+```text
+Nginx worker
+  └─ ngx_http_httpfin_module.so
+       └─ Unix-датаграмма без гарантии доставки
+            └─ /run/httpfin/events.sock
+                 └─ Go httpfin
+                      ├─ нормализация и профиль
+                      ├─ ограниченное хранилище в памяти
+                      └─ /api/connections, /api/report и UI
 ```
 
-Значения `ssl_preread` описывают ClientHello. Это не результат переговоров с
-конечным TLS-сервисом. Согласованные TLS version и ALPN доступны на endpoint,
-который сам завершает TLS.
+Nginx загружает модуль через `load_module`. Модуль работает только во время
+обработки HTTP-запроса:
 
-## Поток события и отчёта
+1. в начале запроса создаётся ID, если включён `httpfin on;`;
+2. Nginx обслуживает или передаёт запрос дальше;
+3. после ответа модуль собирает нужные поля;
+4. запись отправляется в Go через Unix-сокет и не ждёт ответа.
+
+Если сокет недоступен или переполнен, запись может потеряться. Запрос клиента
+при этом продолжает работать. Для полного учёта нужен журнал доступа Nginx.
+
+## Какие данные проходят через систему
 
 ```mermaid
 sequenceDiagram
     participant C as Клиент
     participant N as Nginx
-    participant M as httpfin module
-    participant G as Go collector
-    participant R as API/отчёт
+    participant M as Модуль
+    participant G as Go
+    participant U as Пользователь отчёта
 
-    C->>N: TLS + HTTP-запрос
-    N->>N: termination / proxy
-    N->>M: post-read и log phases
-    M-)G: ограниченный JSON datagram
-    G->>G: normalize, profile, baseline, store
-    R->>G: GET /api/connections
-    G-->>R: JSON observations
-    R->>G: GET /api/report
-    G-->>R: Squid-style TXT
+    C->>N: TLS и HTTP-запрос
+    N->>M: HTTP-поля и TLS-переменные
+    N->>N: обычная обработка запроса
+    M-)G: JSON-событие
+    G->>G: нормализация, профиль, хранение
+    U->>G: /api/connections или /api/report
+    G-->>U: JSON или текстовый отчёт
 ```
 
-Native-модуль работает только внутри HTTP-жизненного цикла Nginx:
+Запись модуля содержит ID, метод, URI, User-Agent, исходный адрес,
+статус, TLS-версию, SNI и ALPN. Время обработки и размер ответа нужно брать
+из прямого Go-режима или журнала доступа Nginx: текущий модуль их не передаёт.
 
-1. Nginx сначала принимает или отклоняет TLS handshake. Только после этого
-   HTTP-модуль видит запрос; raw ClientHello он не разбирает.
-2. В `NGX_HTTP_POST_READ_PHASE`, после чтения headers, модуль создаёт request
-   ID и включает контекст запроса, если действует `httpfin on;`.
-3. Nginx штатно обслуживает запрос или проксирует его upstream.
-4. В `NGX_HTTP_LOG_PHASE`, когда известен финальный status, модуль копирует
-   ограниченный набор HTTP/TLS-полей и отправляет один Unix datagram в Go.
+Профиль клиента — это примерная оценка по User-Agent. Он не доказывает тип
+браузера, личность клиента или наличие бота.
 
-Итак, модуль — это handoff на HTTP-слое от запроса к collector. Это не TLS
-preread-модуль и не proxy. Для passthrough SNI/ALPN используется
-отдельный `ngx_stream_ssl_preread_module` Nginx.
+## Чего проект не делает
 
-## Матрица компонентов
+- хранит данные только в памяти;
+- не сохраняет наблюдения после перезапуска;
+- считает стандартные JA3/JA4;
+- разбирает HTTP/2 на уровне соединения;
+- видит HTTP при TLS passthrough;
+- проверяет личность, блокирует запросы или управляет межсетевым экраном.
 
-| Развёртывание | Go-исполняемый файл | Native-модуль | Результат |
-|---|---:|---:|---|
-| Прямая отладка HTTP/HTTPS | да | нет | Go API, UI, отчёты и прямое TLS-наблюдение |
-| Анализ access log Nginx | внешний collector по необходимости | нет | access log Nginx без handoff-модуля |
-| Nginx termination и структурированный анализ httpfin | да | да | data-plane Nginx плюс Go API, UI и отчёты |
-| Только passthrough-маршрутизация Nginx | нет | нет HTTP-модуля | SNI/ALPN preread и stream routing |
-
-Go-исполняемый файл — не библиотека-помощник для `.so`, а consumer и
-analysis-сервис. Native-модуль — адаптер, который делает request-данные Nginx
-доступными этому сервису.
-
-Точка связи — локальный Unix datagram socket: Go слушает его, а Nginx
-модуль отправляет туда короткое JSON-событие. TCP-порт между ними не нужен.
-
-Datagram — best-effort telemetry. Access log остаётся операционным резервом при
-недоступном сокете или backpressure.
-
-## Модель свидетельств
-
-```mermaid
-flowchart LR
-    UA[User-Agent\nзаявление клиента]
-    TLS[TLS/SNI/ALPN\nнаблюдение wire]
-    H2[HTTP/2 frames\nнаблюдение wire]
-    RQ[HTTP-запрос\napplication metadata]
-    P[Эвристический профиль\nChrome-like и т.п.]
-    E[Диагностический отчёт\nсвязанные признаки]
-
-    UA --> P
-    TLS --> P
-    H2 --> P
-    RQ --> E
-    P --> E
-    TLS --> E
-    H2 --> E
-```
-
-Профиль является выводом, а не доказательством. JA3 и JA4 — форматы сетевого
-fingerprinting, а не механизмы аутентификации: один fingerprint могут иметь
-разные клиенты, его может изменить proxy, и его можно намеренно имитировать.
-
-## Что означает `JA*`
-
-| Имя | Смысл | Входные данные | Состояние в httpfin |
-|---|---|---|---|
-| JA3 | fingerprint TLS-клиента | нормализованные version, cipher suites, extensions, supported groups и point formats ClientHello, затем MD5 | текущий Nginx HTTP-модуль не считает |
-| JA3S | fingerprint ответа TLS-сервера | выбранные поля ответа ServerHello | не собирается |
-| JA4 | новый fingerprint TLS-клиента из семейства FoxIO JA4+ | данные ClientHello, нормализованные в читаемое значение из трёх частей | нужна отдельная программа, читающая TLS до termination |
-| JA4H | fingerprint HTTP-клиента в JA4+ | поведение HTTP-запроса и headers | нужен HTTP-aware collector; из одного handoff-события не выводится |
-| JA4+ | название семейства | методы для TLS, HTTP, TCP, X.509, SSH и др.: JA4, JA4H, JA4T, JA4X | только справочная терминология |
-
-JA3 группирует похожие TLS handshakes, но не удостоверяет браузер. JA4 не
-является полем RFC, а отдельным методом fingerprinting. Для точного значения
-нужны соответствующие raw-данные и та же версия алгоритма, что у reference
-implementation. Сейчас `httpfin` оставляет JA3/JA4/HTTP2 пустыми, если их не
-передала отдельная программа.
-
-## Техническая база
-
-- [RFC 9846 — TLS 1.3](https://www.rfc-editor.org/rfc/rfc9846);
-- [RFC 6066 — SNI](https://www.rfc-editor.org/rfc/rfc6066);
-- [RFC 7301 — ALPN](https://www.rfc-editor.org/rfc/rfc7301);
-- [RFC 9113 — HTTP/2](https://www.rfc-editor.org/rfc/rfc9113);
-- [RFC 9110 — HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110);
-- [Nginx SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html);
-- [JA3 reference](https://github.com/salesforce/ja3), архивированный upstream;
-- [JA4+ reference](https://github.com/FoxIO-LLC/ja4), актуальный upstream FoxIO.
-- [RFC 8446 — исходная спецификация TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446),
-  заменённая RFC 9846;
-- [RFC 9849 — Encrypted ClientHello](https://www.rfc-editor.org/rfc/rfc9849),
-  важный источник для ограничений видимости SNI;
-- [RFC 7239 — Forwarded](https://www.rfc-editor.org/rfc/rfc7239),
-  стандартизованный формат передачи proxy-информации.
+Совместимость динамического модуля, сертификаты и режимы запуска описаны в
+[`OPERATING_MODES.ru.md`](OPERATING_MODES.ru.md). Формат события и отчёта — в
+[`INTEGRATION_FORMAT.ru.md`](INTEGRATION_FORMAT.ru.md). Подробные ограничения
+анализа ClientHello и HTTP/2 — в [`WIRE_OBSERVER.ru.md`](WIRE_OBSERVER.ru.md).

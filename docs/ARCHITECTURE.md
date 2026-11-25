@@ -1,195 +1,125 @@
-# httpfin architecture and observation boundaries
+# How httpfin works
 
-The diagrams below show what is measured at each deployment point. They are
-deliberately explicit about the difference between client offers, negotiated
-values, and HTTP data visible after TLS termination.
+`httpfin` sits in front of an API so the team can see client requests. It does
+not change requests or block clients. The usual production mode is Nginx TLS
+termination with short request records sent to `httpfin`.
 
-## Deployment modes
-
-```mermaid
-flowchart LR
-    C[Client]
-    T[TLS ClientHello]
-    H[HTTP request]
-    A[Application]
-
-    subgraph D[Direct HTTPS mode]
-        G[Go httpfin\nTLS termination + HTTP]
-    end
-    subgraph N[Nginx termination mode]
-        X[Nginx\nTLS termination]
-        M[Native module\nUnix datagram]
-        O[Go collector]
-    end
-    subgraph P[Passthrough mode]
-        S[Nginx stream\nssl_preread]
-        B[Downstream TLS service]
-    end
-
-    C --> T
-    T --> G --> H --> A
-    T --> X --> M --> O
-    X --> H --> A
-    T --> S --> B --> H --> A
-```
-
-## Runtime modes
+## Main flow
 
 ```mermaid
 flowchart LR
     C[Client]
-    subgraph D[Docker / smoke and observation]
-        DN[Nginx + module + Go]
-        DA[Product API]
-        DR[Report / JSON API]
-        DN --> DA
-        DN --> DR
-    end
-    subgraph H[Host / systemd production]
-        HN[Nginx + module + Go]
-        HA[Product API]
-        HN --> HA
-    end
-    C --> DN
-    C --> HN
+    N[Nginx\nTLS termination]
+    A[API under test]
+    M[httpfin HTTP module]
+    G[Go collector]
+    R[JSON API\nUI and report]
+
+    C -->|TLS and HTTP| N
+    N -->|HTTP| A
+    N --> M
+    M -->|bounded Unix datagram| G
+    G --> R
 ```
 
-Both modes are observation-only. Docker is convenient for smoke tests; the
-host/systemd mode is suitable for production because it gives the collector and
-socket stable host permissions and restart behavior.
+Nginx keeps serving the request even when the collector is unavailable. Go keeps
+recent records in memory, reads the User-Agent, and builds the report.
 
-## What each mode can observe
+## Where TLS terminates
 
-```mermaid
-flowchart TD
-    CH[ClientHello]
-    CH -->|direct Go TLS| D1[offered versions\noffered ALPN\nSNI\nClientHello fields]
-    CH -->|Nginx ssl_preread| D2[SNI\noffered ALPN\nadvertised TLS version]
-    CH -->|Nginx termination| D3[Nginx negotiated TLS\nselected ALPN\nHTTP request]
-    D3 --> D4[No original ClientHello\nat the upstream by default]
-    H2[HTTP/2 connection frames] --> D5[Only an HTTP/2-aware\nconnection observer]
+| Mode | Who handles HTTPS | What `httpfin` sees | What it cannot see |
+|---|---|---|---|
+| Nginx termination | Nginx | HTTP, User-Agent, status, IP, TLS, SNI, and ALPN | original ClientHello, exact JA3/JA4, and HTTP/2 SETTINGS |
+| Direct HTTPS | Go/httpfin | HTTP, TLS, SNI, ALPN, and selected ClientHello fields | standard JA3/JA4 without a separate calculation step |
+| TLS passthrough | downstream service | no HTTP request reaches `httpfin` | URL, headers, User-Agent, and status |
+
+In passthrough, Nginx can read SNI, offered ALPN, and the advertised TLS version
+to choose a server. This is a separate Nginx stream module, not the `httpfin`
+HTTP module.
+
+`ClientHello` is the first TLS message sent by a client. After TLS termination it
+is no longer available to the ordinary Nginx HTTP module. It cannot be rebuilt
+from an HTTP request.
+
+## What httpfin can see
+
+| Signal | What the current `httpfin` provides | What it cannot provide |
+|---|---|---|
+| HTTP method and path | Yes, in the Nginx event and direct Go mode | Nothing material at this observation point |
+| Response status | Yes, the final request status | Complete cross-checking without the access log |
+| Source address | Yes, the address seen by the observation point | A trustworthy original address when proxy/real-IP handling is wrong |
+| User-Agent | Yes, the declared value | Proof that it was not spoofed |
+| Client profile | Yes, a rough User-Agent profile; a reference can be compared | Reliable browser or bot classification |
+| TLS version, SNI, ALPN | Yes, when TLS terminates in Nginx or Go | These fields in plain HTTP and some data in passthrough |
+| Request timing and response size | Yes, in direct Go mode or the Nginx access log | In the current Nginx HTTP-module event |
+| Selected ClientHello fields | Yes, only in direct Go TLS mode | In the Nginx HTTP module after TLS termination |
+| Standard JA3 and JA4 | No, the current project does not calculate them | A separate TLS observer or supplied values |
+| HTTP/2 SETTINGS and frame order | No | An HTTP/2 connection-level observer |
+
+An empty value means that the selected observation point did not provide the
+signal. It does not mean that the client mismatched.
+
+## System parts
+
+```text
+Nginx worker
+  └─ ngx_http_httpfin_module.so
+       └─ Unix datagram, no delivery guarantee
+            └─ /run/httpfin/events.sock
+                 └─ Go httpfin
+                      ├─ normalization and profiling
+                      ├─ bounded in-memory store
+                      └─ /api/connections, /api/report, and UI
 ```
 
-`ssl_preread` values describe the ClientHello. They are not the downstream
-connection's negotiated result. In a terminating TLS endpoint, the negotiated
-version and selected ALPN can be recorded after the handshake.
+Nginx loads the module with `load_module`. The module runs only while Nginx is
+processing an HTTP request:
 
-## Event and report pipeline
+1. a request ID is created when `httpfin on;` applies;
+2. Nginx serves or forwards the request;
+3. after the response, the module collects the needed fields;
+4. the record is sent to Go without waiting for a reply.
+
+If the Unix socket is unavailable or full, the record may be lost. The client
+request still continues. Keep the Nginx access log when every request must be
+accounted for.
+
+## Data flow
 
 ```mermaid
 sequenceDiagram
     participant C as Client
     participant N as Nginx
-    participant M as httpfin module
-    participant G as Go collector
-    participant R as Report/API consumer
+    participant M as Module
+    participant G as Go
+    participant U as Report consumer
 
-    C->>N: TLS + HTTP request
-    N->>N: terminate TLS / proxy request
-    N->>M: post-read and log phases
-    M-)G: bounded JSON datagram
-    G->>G: normalize, profile, baseline, store
-    R->>G: GET /api/connections
-    G-->>R: JSON observations
-    R->>G: GET /api/report
-    G-->>R: Squid-style TXT artifact
+    C->>N: TLS and HTTP request
+    N->>M: HTTP fields and TLS variables
+    N->>N: normal request processing
+    M-)G: JSON event
+    G->>G: normalize, profile, store
+    U->>G: /api/connections or /api/report
+    G-->>U: JSON or text report
 ```
 
-The native module is active only inside Nginx's HTTP request lifecycle:
+The module record contains request ID, method, URI, User-Agent, source address,
+status, TLS version, SNI, and ALPN. Request timing and response size come from
+direct Go mode or the Nginx access log; the current module does not include them.
 
-1. Nginx completes or rejects the TLS handshake before the HTTP module sees a
-   request. The module does not parse raw ClientHello.
-2. In `NGX_HTTP_POST_READ_PHASE`, after request headers are read, it allocates
-   the request ID and enables per-request context when `httpfin on;` applies.
-3. Nginx proxies or serves the request normally.
-4. In `NGX_HTTP_LOG_PHASE`, after the request has a final status, the module
-   copies bounded HTTP/TLS variables and sends one Unix datagram to Go.
+The client profile is a User-Agent heuristic. It does not prove a browser type,
+client identity, or bot status.
 
-The module is therefore a request-to-collector handoff at the HTTP layer, not
- a TLS preread module or proxy. It only hands observations to Go.
-`ngx_stream_ssl_preread_module` is a separate Nginx stream module used for
-passthrough SNI/ALPN routing.
+## Project boundaries
 
-## Component decision matrix
+- the JSON API and text report use the current in-memory store;
+- observations are lost after a restart;
+- standard JA3/JA4 are not calculated by the current HTTP module;
+- connection-level HTTP/2 is not analyzed;
+- TLS passthrough does not provide HTTP data to `httpfin`;
+- the module does not identify clients, block requests, or control the firewall.
 
-| Deployment | Go executable | Native module | What you get |
-|---|---:|---:|---|
-| Direct HTTP/HTTPS debugging | yes | no | Go API, UI, reports and direct TLS observation |
-| Nginx access-log analysis | optional external collector | no | Nginx request log; no module handoff |
-| Nginx termination with structured httpfin analysis | yes | yes | Nginx data plane plus Go API, UI and reports |
-| Nginx passthrough routing only | no | no HTTP module | SNI/ALPN preread and stream routing |
-
-The Go executable is not a helper library for the `.so`; it is the consumer and
-analysis service. The native module is an adapter that makes Nginx request data
-available to that service.
-
-The connection point is a local Unix datagram socket: Go listens on it and the
-Nginx module sends a short JSON event to it. No TCP port is needed between them.
-
-The datagram is best-effort telemetry. Access logs remain the operational
-fallback when a collector socket is unavailable or under backpressure.
-
-## Evidence model
-
-```mermaid
-flowchart LR
-    UA[User-Agent\nclient claim]
-    TLS[TLS/SNI/ALPN\nwire observation]
-    H2[HTTP/2 frames\nwire observation]
-    RQ[HTTP request\napplication metadata]
-    P[Heuristic profile\nChrome-like etc.]
-    E[Diagnostic report\ncorrelated evidence]
-
-    UA --> P
-    TLS --> P
-    H2 --> P
-    RQ --> E
-    P --> E
-    TLS --> E
-    H2 --> E
-```
-
-The profile is an inference. JA3 and JA4 are fingerprinting formats, not
-authentication mechanisms; a fingerprint can be shared by different clients,
-changed by a proxy, or deliberately imitated.
-
-## What `JA*` means
-
-| Name | Meaning | Input | Status in httpfin |
-|---|---|---|---|
-| JA3 | TLS client fingerprint | normalized ClientHello version, cipher suites, extensions, supported groups and point formats, then an MD5 digest | not computed by the current Nginx HTTP module |
-| JA3S | TLS server-response fingerprint | selected fields from the ServerHello response | not collected |
-| JA4 | newer TLS client fingerprint in the FoxIO JA4+ family | ClientHello-derived, normalized into a readable three-part value | requires a separate program that reads TLS before termination |
-| JA4H | HTTP client fingerprint in JA4+ | HTTP request behavior and headers | requires an HTTP-aware collector; not inferred from one handoff event |
-| JA4+ | family name | TLS, HTTP, TCP, X.509, SSH and other methods such as JA4, JA4H, JA4T and JA4X | reference terminology only |
-
-JA3 is a method for grouping similar TLS handshakes, not a browser identity.
-JA4 is not an RFC-defined protocol field; it is a separate fingerprinting
-method. Exact values require the corresponding raw traffic and the same
-algorithm/version as the reference implementation. `httpfin` currently keeps
-JA3/JA4/HTTP2 fields empty unless a separate program supplies them.
-
-## Scientific basis
-
-- [RFC 9846 — TLS 1.3](https://www.rfc-editor.org/rfc/rfc9846) defines the
-  current TLS 1.3 specification and updates RFC 8446;
-- [RFC 6066 — SNI](https://www.rfc-editor.org/rfc/rfc6066) defines the
-  `server_name` ClientHello extension;
-- [RFC 7301 — ALPN](https://www.rfc-editor.org/rfc/rfc7301) defines client
-  protocol offers and server protocol selection;
-- [RFC 9113 — HTTP/2](https://www.rfc-editor.org/rfc/rfc9113) defines the
-  connection preface, SETTINGS and binary frames;
-- [RFC 9110 — HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110) defines
-  methods, targets, status codes and message fields;
-- [Nginx SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html)
-  documents the fields Nginx can extract without terminating TLS;
-- [JA3 reference](https://github.com/salesforce/ja3) describes the TLS
-  ClientHello fingerprint format and is now archived;
-- [JA4+ reference](https://github.com/FoxIO-LLC/ja4) documents the current
-  JA4+ family maintained by FoxIO.
-- [RFC 8446 — original TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446)
-  remains a useful historical reference; it is obsoleted by RFC 9846;
-- [RFC 9849 — Encrypted ClientHello](https://www.rfc-editor.org/rfc/rfc9849)
-  explains why the visible outer SNI may not be the client's true destination;
-- [RFC 7239 — Forwarded](https://www.rfc-editor.org/rfc/rfc7239) defines the
-  standardized proxy-forwarding field used for identity propagation.
+See [`OPERATING_MODES.md`](OPERATING_MODES.md) for compatibility, certificates,
+and deployment modes. See [`INTEGRATION_FORMAT.md`](INTEGRATION_FORMAT.md) for
+the event and report format. See [`WIRE_OBSERVER.md`](WIRE_OBSERVER.md) for the
+ClientHello and HTTP/2 observation limits.
