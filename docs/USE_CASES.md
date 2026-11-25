@@ -41,10 +41,10 @@ send the request with the expected hostname.
 
 ## TLS and SNI troubleshooting
 
-Use direct HTTPS mode when the ClientHello is needed. Use Nginx stream
-`ssl_preread` for passthrough routing. Use Nginx termination plus the native
-module when HTTP fields and operational integration matter more than raw
-ClientHello data.
+Use direct HTTPS mode for direct TLS diagnostics. The current Go listener does
+not yet parse raw ClientHello. Use Nginx stream `ssl_preread` for passthrough
+routing. Use Nginx termination plus the native module when HTTP fields and
+operational integration matter more than raw ClientHello data.
 
 ## Regression testing
 

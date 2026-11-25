@@ -5,7 +5,7 @@ Choose the observation point before deploying `httpfin`.
 | Mode | TLS terminator | Certificate for httpfin | Visible data | Best for |
 |---|---|---:|---|---|
 | Plain HTTP API debugging | none | no | HTTP request/response | SDK and API debugging |
-| Direct HTTPS listener | Go/httpfin | yes | TLS, SNI, ALPN, HTTP | ClientHello experiments |
+| Direct HTTPS listener | Go/httpfin | yes | TLS, SNI, ALPN, HTTP | direct TLS diagnostics |
 | Nginx TLS termination | Nginx | no | Nginx TLS fields + HTTP handoff | production ingress |
 | Nginx TLS passthrough | downstream service | no for Nginx | SNI, offered ALPN, advertised TLS version | routing diagnostics |
 
@@ -22,7 +22,10 @@ go run ./cmd/httpfin
 
 Use a self-signed certificate for local tests and a certificate for the real
 hostname in shared or production environments. Keep the private key readable
-only by the service account.
+only by the service account. The current listener already receives selected
+ClientHello fields through Go's TLS callback and records a local signature, but
+it does not calculate standard JA3/JA4. That is a separate TODO item based on a
+TLS-aware listener.
 
 ## Nginx termination
 

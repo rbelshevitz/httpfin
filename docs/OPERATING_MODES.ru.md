@@ -9,7 +9,7 @@ ingress и приложением. Перед запуском нужно выб
 | Сценарий | Кто принимает TLS | Сертификат для httpfin | Что видно | Основной результат |
 |---|---|---:|---|---|
 | Локальная отладка HTTP API | никто | нет | HTTP-запрос | проверить метод, URL, UA, статус |
-| `httpfin` принимает HTTPS напрямую | `httpfin`/Go | да | TLS, SNI, ALPN и HTTP | проверить настоящий клиентский handshake |
+| `httpfin` принимает HTTPS напрямую | `httpfin`/Go | да | TLS, SNI, ALPN и HTTP | прямая диагностика TLS |
 | Nginx termination | Nginx | нет для Go | Nginx TLS-поля + HTTP handoff | production ingress и API troubleshooting |
 | Nginx `stream` passthrough | downstream-сервис | нет для Nginx | SNI, предложенный ALPN, заявленная версия TLS | проверить маршрутизацию до backend |
 | тестовый контейнер | Nginx | генерируется автоматически | HTTPS/SNI/HTTP/2 | smoke-тест интеграции |
@@ -36,8 +36,9 @@ curl -v -X POST http://127.0.0.1:8080/login \
 
 ## 2. `httpfin` принимает HTTPS напрямую
 
-Этот режим нужен, когда важно увидеть ClientHello до обработки HTTP-сессии:
-SNI, предложенный ALPN, согласованный протокол и наблюдаемые TLS-параметры.
+Этот режим нужен для прямой диагностики TLS и HTTP без Nginx. Текущий Go-
+слушатель получает отдельные поля ClientHello через callback TLS и сохраняет
+локальную подпись, но ещё не считает стандартные JA3/JA4. Это отдельная задача.
 
 ```bash
 httpfin_tls_cert=/etc/httpfin/tls/server.crt \

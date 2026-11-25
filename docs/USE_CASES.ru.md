@@ -50,7 +50,8 @@ http.ListenAndServeTLS(":8443", "server.crt", "server.key", handler)
 
 1. Отправить обычный Python `requests` с User-Agent Chrome.
 2. Отправить `curl_chrome116`.
-3. Сравнить профиль, JA3/JA4, ALPN, HTTP/2 и UA consistency.
+3. Сравнить профиль, ALPN, HTTP/2 и UA consistency. JA3/JA4 сравнивать только
+   если в тесте подключён отдельный наблюдатель ClientHello.
 4. Проверить, одинаково ли ведут себя `/login`, `/token`, `/download` и чувствительные API-методы.
 
 

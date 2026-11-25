@@ -61,8 +61,9 @@ ClientHello fingerprint to this HTTP module.
 
 `ClientHello` is the first TLS handshake message sent by the client. It contains
 the offered TLS versions, cipher suites and extensions. JA3/JA4 are derived
-from such handshake data. Capturing them requires a separate TLS-aware proxy or
-wire observer before TLS termination; it is not part of the current module.
+from such handshake data. Capturing them requires a TLS-aware listener at the
+termination point. The current Nginx HTTP module is not such a listener; a
+future direct-Go mode may add this with a suitable library.
 
 Reports are generated on request and are not written to a server-side report
 directory. The redirected file is created by the shell running `curl`.
