@@ -27,28 +27,21 @@ flowchart LR
     A[Приложение]
     H["HTTP-уровень<br/>метод · URL · статус · UA · IP · время · bytes"]
     T["TLS на границе<br/>версия · SNI · ALPN"]
-    W["TLS/HTTP2 connection observer<br/>ClientHello · JA3/JA4 · HTTP/2 SETTINGS"]
 
     C -->|TLS + HTTP| N
     N -->|HTTP| A
     N --> H
     N --> T
-    C -.->|до TLS termination| W
 
     classDef current fill:#eaf6ee,stroke:#2f7d4a,color:#123b21
-    classDef future fill:#f4f4f4,stroke:#777,color:#333,stroke-dasharray:5 5
     class H,T current
-    class W future
 ```
 
-Зелёные уровни уже доступны в текущем продукте. Пунктирный уровень — будущий
-компонент, наблюдающий соединение целиком; для основной диагностики API он не
-нужен.
+Показанные уровни уже доступны в текущем продукте.
 
 Для большинства QA- и API-тестов достаточно текущих HTTP-наблюдений и полей TLS
 на границе: запрос, клиент, User-Agent, профиль, статус, время, bytes, версия
-TLS, SNI, ALPN и протокол. Будущий connection observer — это дополнительный
-уровень для специальных расследований TLS/HTTP2 fingerprinting.
+TLS, SNI, ALPN и протокол.
 
 ## Зачем она нужна?
 
@@ -235,11 +228,8 @@ Unix-датаграмму.
 На HTTP-фазе Nginx исходный `ClientHello` уже недоступен. Отсюда следуют две
 жёсткие границы текущего модуля:
 
-- стандартные JA3/JA4 нельзя восстановить в этой точке; для них нужен
-  TLS/HTTP2 connection observer до TLS termination или захват исходного
-  ClientHello;
-- настройки и fingerprint HTTP/2 требуют observer, который видит соединение
-  целиком; текущий request-level hook их не видит.
+- стандартные JA3/JA4 и connection-level fingerprint HTTP/2 не собираются
+  встроенным Nginx request-level путём;
 
 Заголовки ответа — отдельное достижимое расширение. Nginx может их наблюдать,
 но текущая схема события их пока не содержит. Добавление заголовков расширит
@@ -324,7 +314,6 @@ docker rm -f httpfin
 - [`docs/USE_CASES.ru.md`](docs/USE_CASES.ru.md) — практические сценарии для API, QA и эксплуатации;
 - [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md) — TLS, сертификаты и режимы Nginx;
 - [`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md) — событие модуля и формат отчёта;
-- [`docs/WIRE_OBSERVER.ru.md`](docs/WIRE_OBSERVER.ru.md) — границы ClientHello и HTTP/2;
 - [`docs/DEVOPS_RUNBOOK.ru.md`](docs/DEVOPS_RUNBOOK.ru.md) — эксплуатационная диагностика;
 - [`docs/OBSERVATION_SEMANTICS.ru.md`](docs/OBSERVATION_SEMANTICS.ru.md) — точная семантика Risk, Baseline и evidence;
 - [`docs/SECURITY_AUDIT.ru.md`](docs/SECURITY_AUDIT.ru.md) — аудит безопасности и надёжности;

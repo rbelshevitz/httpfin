@@ -26,28 +26,21 @@ flowchart LR
     A[Application]
     H["HTTP level<br/>method · URL · status · UA · IP · timing · bytes"]
     T["TLS edge<br/>version · SNI · ALPN"]
-    W["TLS/HTTP2 connection observer<br/>ClientHello · JA3/JA4 · HTTP/2 SETTINGS"]
 
     C -->|TLS + HTTP| N
     N -->|HTTP| A
     N --> H
     N --> T
-    C -.->|before TLS termination| W
 
     classDef current fill:#eaf6ee,stroke:#2f7d4a,color:#123b21
-    classDef future fill:#f4f4f4,stroke:#777,color:#333,stroke-dasharray:5 5
     class H,T current
-    class W future
 ```
 
-The green levels are available in the current product. The dashed level is a
-future connection-level component; it is not required for the main API
-diagnostic workflow.
+The shown levels are available in the current product.
 
 For most QA and API-client tests, the current HTTP observations plus the TLS
 edge fields are sufficient: request, client, User-Agent, profile, status,
-timing, bytes, TLS version, SNI, ALPN, and protocol. The future connection
-observer is an optional escalation for TLS/HTTP2 fingerprint investigations.
+timing, bytes, TLS version, SNI, ALPN, and protocol.
 
 ## Why it is useful
 
@@ -231,11 +224,8 @@ event goes to Go after request processing through a non-blocking Unix datagram.
 At the Nginx HTTP phase, the original `ClientHello` is no longer available.
 This creates two hard boundaries for the current module:
 
-- standard JA3/JA4 cannot be reconstructed at this point; collecting them
-  requires a TLS/HTTP2 connection observer before TLS termination or a raw
-  ClientHello capture;
-- HTTP/2 connection settings and fingerprints require a connection-aware
-  observer and cannot come from this request-level hook.
+- standard JA3/JA4 and HTTP/2 connection fingerprints are not collected by
+  the built-in Nginx request path;
 
 Response headers are a separate, achievable extension: Nginx can observe them,
 but the current event schema does not include them yet. Adding response headers
@@ -325,7 +315,6 @@ If Alpine cannot download packages because of DNS, retry the build with
 - [`docs/USE_CASES.md`](docs/USE_CASES.md) — practical workflows for API, QA, and operations;
 - [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md) — TLS, certificates, and Nginx modes;
 - [`docs/INTEGRATION_FORMAT.md`](docs/INTEGRATION_FORMAT.md) — module events and report format;
-- [`docs/WIRE_OBSERVER.md`](docs/WIRE_OBSERVER.md) — ClientHello and HTTP/2 boundaries;
 - [`docs/DEVOPS_RUNBOOK.md`](docs/DEVOPS_RUNBOOK.md) — operational troubleshooting;
 - [`docs/OBSERVATION_SEMANTICS.md`](docs/OBSERVATION_SEMANTICS.md) — exact semantics of Risk, Baseline, and evidence;
 - [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md) — security and reliability audit;

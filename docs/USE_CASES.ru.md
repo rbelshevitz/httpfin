@@ -228,5 +228,4 @@ JA3/JA4 не заменяют RFC-модель и не должны называ
 - [NGINX ssl_preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html) — SNI/ALPN из ClientHello без termination;
 - [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) — исходная спецификация TLS 1.3, заменённая RFC 9846;
 - [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849) — Encrypted ClientHello;
-- [`WIRE_OBSERVER.ru.md`](WIRE_OBSERVER.ru.md) — ограничения анализа ClientHello и HTTP/2;
 - [Squid logformat](https://www.squid-cache.org/Doc/config/logformat/) — поля и модель access report.

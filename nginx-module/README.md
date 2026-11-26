@@ -5,8 +5,8 @@ It is an HTTP dynamic module written in C: it emits bounded events and hands
 them to the Go inspector over a Unix datagram.
 
 The module exposes request and Nginx TLS fields. Raw ClientHello, standard
-JA3/JA4, and connection-level HTTP/2 fingerprints belong to a separate wire
-observer.
+JA3/JA4, and connection-level HTTP/2 fingerprints are outside the built-in
+request-level collection path.
 
 ## What it does
 

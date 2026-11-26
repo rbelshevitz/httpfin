@@ -21,12 +21,6 @@ HTML status page, TLS/HTTP modes, Docker smoke path, and documentation.
 - [ ] Expose collector metrics for Prometheus: `received`, `decoded`,
   `stored`, `dropped`, handoff errors, store size, uptime, and ingest health.
 
-### Future
-
-- [ ] Design and implement a separate TLS/HTTP2 connection observer in Go for
-  raw ClientHello, standard JA3/JA4, and connection-level HTTP/2 evidence. Keep
-  it outside the Nginx HTTP-module path.
-
 ## Deliberately deferred
 
 SQLite or another durable history store, automatic profile updates, and

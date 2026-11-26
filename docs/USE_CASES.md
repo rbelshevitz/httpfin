@@ -72,5 +72,5 @@ of treating every change as abuse.
 - [RFC 8446 — original TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446)
 - [RFC 9849 — Encrypted ClientHello](https://www.rfc-editor.org/rfc/rfc9849)
 
-For the meaning and limitations of JA3, JA3S, JA4 and JA4H, see
-[`WIRE_OBSERVER.md`](WIRE_OBSERVER.md).
+JA3/JA4 and HTTP/2 fingerprint fields are optional external values. The built-in
+Nginx HTTP path does not calculate them.
