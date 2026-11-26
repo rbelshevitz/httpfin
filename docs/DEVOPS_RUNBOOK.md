@@ -2,15 +2,12 @@
 
 ## What httpfin provides
 
-`httpfin` helps answer questions that an ordinary access log often cannot:
+Use `httpfin` to inspect the request path at the API edge:
 
-- did the request reach Nginx and the Go collector;
-- which source address does the edge actually see;
-- which SNI and ALPN arrived from the client;
-- was HTTP/2 or HTTP/1.1 selected;
-- what request time did the observation point measure;
-- whether the Nginx-to-collector handoff reported backpressure or another error;
-- can the result be attached to an incident ticket as a readable report.
+- confirm delivery from Nginx to the Go collector;
+- inspect the source address, SNI, ALPN, HTTP version, status, and request time;
+- compare the Nginx handoff with `/api/ingest` and access-log volume;
+- attach a readable report to an incident ticket.
 
 ## Run the Docker image
 

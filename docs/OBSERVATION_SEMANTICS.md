@@ -1,8 +1,8 @@
 # Observation field semantics
 
-This document defines what each field in an `httpfin` observation means and
-where it comes from. These fields are observation signals, not proof of client
-identity.
+Use this reference to interpret each field in an `httpfin` observation and trace
+it to its source. Transport and HTTP fields describe what the observation point
+received; heuristic fields describe a classification based on available data.
 
 ## Risk
 

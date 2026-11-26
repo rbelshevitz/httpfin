@@ -4,9 +4,9 @@
 > current release. There is no separate wire-observer process, raw-packet
 > capture path, standard JA3/JA4 calculation, or HTTP/2 connection observer.
 
-This document fixes the boundary for the first diagnostic priority: raw TLS
-and HTTP/2 evidence. It prevents the HTTP module from pretending that a
-request-level hook can reconstruct connection-level fingerprints.
+This document defines the future raw-TLS and HTTP/2 observation boundary. It
+separates connection-level evidence from the request-level data collected by
+the current HTTP module.
 
 ## What each observation point can know
 

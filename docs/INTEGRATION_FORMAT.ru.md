@@ -20,7 +20,7 @@ Nginx ── TLS termination, SNI/ALPN, proxy, access log
 
 ### Nginx
 
-Nginx остаётся data-plane:
+Nginx отвечает за data plane:
 
 - принимает или пропускает TLS;
 - выбирает виртуальный сервер по SNI;

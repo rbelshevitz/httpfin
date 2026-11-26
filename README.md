@@ -8,14 +8,12 @@
 
 > **Observe the client. Explain the path.**
 
-`httpfin` is a diagnostic service placed in front of an API. It collects the
-HTTP-client signals available at the observation point and produces a JSON API,
-UI, and readable text report.
+`httpfin` is a diagnostic service for an API edge. It records the HTTP client,
+request, response, protocol, TLS, and observation-point signals visible at that
+edge, then presents them through a JSON API, UI, and readable text report.
 
-`httpfin` is not an authentication system, does not identify people, and does
-not block requests. `curl-impersonate` is used only to generate reference
-traffic; that project is maintained under the
-[`lwthiker`](https://github.com/lwthiker) account.
+Use it to compare browsers, SDKs, proxies, ingress changes, and reference
+traffic from `curl-impersonate` at the same observation point.
 
 ## Why this tool is useful
 
@@ -28,11 +26,28 @@ This helps separate an API problem from a browser, SDK, proxy, TLS, or Nginx
 change. The result can be saved as a readable report for QA, developers, or
 DevOps.
 
+## Do you need the Nginx module?
+
+Use the module when Nginx is the entry point that terminates TLS and proxies
+traffic to the application. It sends each completed request to the Go
+collector, including the client address, URL, User-Agent, status, timing,
+response size, protocol, TLS version, SNI, and ALPN when available.
+
+The module is not required when `httpfin` itself receives the traffic:
+
+- `go-http` — direct HTTP observation on port `8080`;
+- `go-tls` — direct HTTPS observation with TLS and SNI/ALPN fields;
+- Nginx termination — Nginx module plus the Go collector.
+
+Choose the first two modes for a local client test or a dedicated diagnostic
+listener. Choose the Nginx mode to observe the traffic that actually enters an
+existing Nginx-based API edge.
+
 ## Quick start: useful deployment
 
-The useful result comes from sending application traffic through Nginx with
-the `httpfin` module enabled. The Go collector is not a reverse proxy and does
-not connect to your application by itself.
+Send application traffic through Nginx with the `httpfin` module enabled. Nginx
+remains the data-plane proxy; the Go collector receives observations and serves
+the UI and reports.
 
 In the first terminal, start the collector on a private address:
 

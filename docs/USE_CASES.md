@@ -1,7 +1,7 @@
 # Practical httpfin use cases
 
-`httpfin` is useful when the response body alone does not explain a client or
-proxy problem.
+Use `httpfin` to compare client, proxy, and ingress behavior when the response
+body is only part of the diagnosis.
 
 ## QA quick check
 

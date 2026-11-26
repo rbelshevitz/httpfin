@@ -1,8 +1,12 @@
 # httpfin native NGINX module
 
-This directory contains the native NGINX integration for `httpfin`. It is an
-HTTP dynamic module written in C. It does not replace the Go inspector and
-does not calculate JA3/JA4 or HTTP/2 fingerprints inside an NGINX worker.
+This directory contains the native NGINX request-level adapter for `httpfin`.
+It is an HTTP dynamic module written in C: it emits bounded events and hands
+them to the Go inspector over a Unix datagram.
+
+The module exposes request and Nginx TLS fields. Raw ClientHello, standard
+JA3/JA4, and connection-level HTTP/2 fingerprints belong to a separate wire
+observer.
 
 ## What it does
 

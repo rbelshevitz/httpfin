@@ -1,9 +1,8 @@
 # Security and reliability audit
 
-This is an engineering audit of the current implementation, not a claim of
-formal security certification. The highest-priority items should be fixed
-before exposing the direct listener or the Unix socket to an untrusted
-environment.
+This engineering audit records the current security and reliability posture.
+The P0 items define the release gate for exposing the direct listener or Unix
+socket to an untrusted environment.
 
 ## Findings
 
