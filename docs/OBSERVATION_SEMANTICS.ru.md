@@ -9,10 +9,8 @@
 - HTTP method, URL, status, elapsed time и bytes — наблюдения access-уровня;
 - `User-Agent` заявляется клиентом и легко изменяется;
 - `detected_profile` — эвристика, обычно построенная по User-Agent;
-- версия TLS, negotiated/offered ALPN, SNI и `ClientHelloSig` доступны только
-  в соответствующей точке наблюдения;
-- поля JA3, JA4 и HTTP/2 fingerprint могут прийти от внешнего источника;
-  встроенные production-пути их не вычисляют;
+- версия TLS, negotiated/offered ALPN и SNI доступны только в соответствующей
+  точке наблюдения;
 - `observation_point` показывает источник, создавший запись.
 
 Транспортные признаки сложнее изменить обычным HTTP-заголовком, но их всё ещё

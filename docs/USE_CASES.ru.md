@@ -58,15 +58,14 @@ httpfin только нужные поля, маскируйте секреты 
 
 ## 3. Проверка заявленного браузера
 
-Сравнение User-Agent с TLS, ALPN и HTTP/2 помогает заметить изменение сетевого
-поведения клиента и проверить его по журналам API.
+Сравнение User-Agent с доступными TLS- и HTTP-признаками помогает заметить
+изменение сетевого поведения клиента и проверить его по журналам API.
 
 Сценарий:
 
 1. Отправить обычный Python `requests` с User-Agent Chrome.
 2. Отправить `curl_chrome116`.
-3. Сравнить профиль, ALPN, HTTP/2 и UA consistency. JA3/JA4 сравнивать только
-   если в тесте подключён отдельный наблюдатель ClientHello.
+3. Сравнить профиль, ALPN, HTTP-версию и соответствие User-Agent профилю.
 4. Проверить, одинаково ли ведут себя `/login`, `/token`, `/download` и чувствительные API-методы.
 
 
@@ -81,8 +80,8 @@ curl_safari15_5 --compressed -v https://inspector.example.test/fixture
 ```
 
 После обновления Nginx, OpenSSL, HTTP/2 proxy или `curl-impersonate` сравните
-экспорт `/api/report`. Изменение fingerprint не всегда означает поломку, но
-его следует зафиксировать как изменение сетевого поведения.
+экспорт `/api/report`. Изменение транспортных признаков не всегда означает
+поломку, но его следует зафиксировать как изменение сетевого поведения.
 
 Важно: транспортные и клиентские признаки привязаны к версии окружения. Новый
 Chrome или новый wrapper может законно изменить их, поэтому сравнение нужно
@@ -92,7 +91,7 @@ Chrome или новый wrapper может законно изменить их
 
 Если Nginx терминирует TLS, backend видит уже расшифрованный HTTP. Поэтому
 access log передаёт полезные request-level поля, но не весь исходный
-ClientHello.
+TLS-параметры, которые доступны в точке наблюдения.
 
 Для обычной диагностики включить `configs/nginx/httpfin.conf` и проверить:
 
@@ -104,25 +103,12 @@ ClientHello.
 Если SNI или ALPN нужны до TLS termination, используйте
 `stream_ssl_preread`.
 
-Встроенный TLS listener httpfin использует Go `GetConfigForClient` и сохраняет
-SNI, предложенный ALPN и стабильную подпись наблюдаемых параметров
-ClientHello.
-
-Для строгого JA3/JA4 нужен отдельный parser всех полей ClientHello. Одного
-access log Nginx для этого недостаточно.
-
 ### Что происходит при TLS и SNI
 
-1. Клиент сначала отправляет `ClientHello`, где может быть SNI и список ALPN.
-2. В режиме `http { listen 443 ssl; }` Nginx принимает ClientHello, выбирает
-   сертификат и виртуальный server, завершает TLS, а затем видит HTTP.
-3. В режиме `stream { ssl_preread on; }` Nginx читает ClientHello без
-   расшифровки и может маршрутизировать по SNI/ALPN. HTTP method, URL, status и
-   User-Agent в этом режиме недоступны.
-4. После TLS termination исходный ClientHello уже не передаётся в upstream
-   автоматически. Для JA3/JA4 нужен отдельный сборщик до termination. Текущий
-   Nginx-модуль передаёт TLS version, SNI и ALPN, но не выдаёт JA3/JA4 из
-   HTTP-фазы.
+1. В режиме `http { listen 443 ssl; }` Nginx завершает TLS, а затем видит HTTP.
+2. В режиме `stream { ssl_preread on; }` Nginx может маршрутизировать трафик
+   по доступным TLS-признакам, но HTTP method, URL, status и User-Agent в этом
+   режиме недоступны.
 
 Для проверки встроенного TLS listener:
 
@@ -133,7 +119,7 @@ curl -s http://127.0.0.1:8080/api/report
 ```
 
 В отчёте должны появиться `sni=api.example.test`, `tls=TLS 1.3`, `alpn=h2`
-или `http/1.1`, а также `offered_alpn` и `hello`.
+или `http/1.1`, а также `offered_alpn`.
 
 Если SNI отсутствует, это фиксируется как пустое значение. Нельзя подставлять
 HTTP `Host` и выдавать его за TLS SNI.
@@ -147,7 +133,7 @@ SNI — это имя, предложенное клиентом для выбо
 Готовый пример preread-режима находится в
 [`configs/nginx/httpfin-stream.conf`](../configs/nginx/httpfin-stream.conf).
 Он логирует SNI, ALPN и stream-level bytes/session time, но намеренно не
-обещает HTTP-level fingerprint.
+обещает HTTP-level наблюдение.
 
 ## 6. Анализ отправок и проблем с прокси
 
@@ -190,26 +176,18 @@ curl -sS http://127.0.0.1:8080/api/report > incident-2026-11-25.txt
 
 ## 8. Как не ошибиться с интерпретацией
 
-- Сигнатуры могут совпадать у многих клиентов и могут меняться после обновления браузера.
 - Прокси и TLS termination могут скрыть или изменить признаки исходного клиента.
 - IP не равен устройству: NAT, VPN и мобильные сети меняют картину.
-- Не храните raw fingerprint дольше, чем нужно расследованию; ограничивайте срок
-  хранения и объём данных.
+- Ограничивайте срок хранения и объём диагностических данных.
 - Для проверки доступа используйте штатные механизмы API: аутентификацию,
   права и журнал приложения. `httpfin` предназначен для диагностики транспорта.
 
 ## 9. Нормативная модель протокола
 
-В реализации разделяем стандартизированные наблюдения и эвристические fingerprints:
+В реализации разделяем стандартизированные наблюдения и эвристические признаки:
 
-- TLS ClientHello и negotiated version — модель TLS 1.3. В текущем RFC Editor
-  актуальная редакция TLS 1.3 — [RFC 9846](https://www.rfc-editor.org/rfc/rfc9846),
-  которая обновляет RFC 8446.
 - ALPN — [RFC 7301](https://www.rfc-editor.org/rfc/rfc7301). Значение `h2`
   означает выбор HTTP/2, но само по себе не доказывает, что клиент — браузер.
-- HTTP/2 connection и binary framing — [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113).
-  SETTINGS, порядок кадров и приоритеты могут быть полезными признаками. Это
-  наблюдаемая реализация клиента, а не отдельный RFC fingerprint.
 - HTTP semantics — [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110): метод,
   target, status и поля запроса должны храниться отдельно от TLS-признаков.
 - Цепочка прокси — [RFC 7239](https://www.rfc-editor.org/rfc/rfc7239)
@@ -217,16 +195,10 @@ curl -sS http://127.0.0.1:8080/api/report > incident-2026-11-25.txt
   явно доверенного proxy hop; иначе клиент может подделать исходный IP.
 - SNI — [RFC 6066](https://www.rfc-editor.org/rfc/rfc6066), а ограничения видимости имени при ECH — [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849).
 
-JA3/JA4 не заменяют RFC-модель и не должны называться «идентификатором
-клиента». Встроенный httpfin их не вычисляет; такие поля могут прийти только
-от внешнего источника.
-
 ## Источники и техническая база
 
 - [curl-impersonate README](https://github.com/lwthiker/curl-impersonate) — browser-like TLS/HTTP handshakes и профили;
 - [curl-impersonate Quick Start](https://curl-impersonate.readthedocs.io/en/latest/quick_start.html) — запуск wrapper profiles;
 - [NGINX log module](https://nginx.org/en/docs/http/ngx_http_log_module.html) — `log_format`, JSON escaping и request timing;
-- [NGINX ssl_preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html) — SNI/ALPN из ClientHello без termination;
-- [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) — исходная спецификация TLS 1.3, заменённая RFC 9846;
-- [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849) — Encrypted ClientHello;
+- [NGINX ssl_preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html) — TLS-признаки для маршрутизации без termination;
 - [Squid logformat](https://www.squid-cache.org/Doc/config/logformat/) — поля и модель access report.

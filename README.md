@@ -164,7 +164,7 @@ evidence, and details for the selected record.
 `/api/ingest` exposes the Nginx-to-Go pipeline counters. `received` is the
 number of datagrams read, `decoded` is valid JSON, `stored` reached the
 collector store, and `dropped` was rejected as malformed or invalid. These
-counters describe telemetry delivery, not client risk or request quality.
+counters describe telemetry delivery.
 
 By default the collector listens only on `127.0.0.1:8080` and keeps a bounded
 number of recent observations in memory.
@@ -221,15 +221,7 @@ User-Agent, source address, final HTTP status, negotiated TLS version, SNI,
 and ALPN. It also sends request time, response size, and server protocol. The
 event goes to Go after request processing through a non-blocking Unix datagram.
 
-At the Nginx HTTP phase, the original `ClientHello` is no longer available.
-This creates two hard boundaries for the current module:
-
-- standard JA3/JA4 and HTTP/2 connection fingerprints are not collected by
-  the built-in Nginx request path;
-
-Response headers are a separate, achievable extension: Nginx can observe them,
-but the current event schema does not include them yet. Adding response headers
-would extend the module contract; it would not require JA3/JA4 collection.
+Response headers are not part of the current event schema.
 
 Timing and response size are normalized into `elapsed_ms` and `bytes` when the
 Nginx variables are available; missing values remain zero.
@@ -237,10 +229,8 @@ Nginx variables are available; missing values remain zero.
 ### Direct Go TLS
 
 When `httpfin` terminates HTTPS itself, it additionally records the negotiated
-TLS version, SNI, selected ALPN, the client's offered ALPN list, and an
-internal `ClientHello` signature. This signature is a local SHA-256 over selected
-Go `ClientHelloInfo` fields; it is not standard JA3 or JA4. In this mode httpfin
-also measures response time and size.
+TLS version, SNI, selected ALPN, and the client's offered ALPN list. In this
+mode httpfin also measures response time and size.
 
 ### TLS passthrough
 

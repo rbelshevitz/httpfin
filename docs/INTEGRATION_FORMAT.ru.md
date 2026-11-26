@@ -28,7 +28,7 @@ Nginx отвечает за data plane:
 - проксирует HTTP и пишет access log;
 - передаёт компактное событие в локальный Unix socket.
 
-Nginx-модуль не должен хранить историю, считать JA3/JA4, обращаться к базе,
+Nginx-модуль не должен хранить историю, обращаться к базе,
 делать DNS/HTTP-запросы или ждать ответа Go-сборщика.
 
 ### Модуль
@@ -125,7 +125,7 @@ Go: `received`, `decoded`, `stored` и `dropped`. Они не учитывают
 ### 2. Unix datagram от модуля
 
 Модуль отправляет компактное событие. Заголовки ответа пока не входят в
-контракт события; это отдельное расширение Nginx-модуля:
+контракт события:
 
 ```json
 {"version":1,"request_id":"15-0","method":"GET","uri":"/healthz","host":"inspector.example.test","user_agent":"curl/8.10.1","remote_addr":"172.17.0.1","status":204,"request_time":"0.001","bytes_sent":"0","protocol":"HTTP/2.0","tls_version":"TLS 1.3","sni":"inspector.example.test","alpn":"h2"}
@@ -161,9 +161,7 @@ Nginx не завершал TLS, модуль включён в plain HTTP serve
 ```
 
 Профиль Nginx handoff определяется по заявленному User-Agent и потому остаётся
-эвристикой. Если User-Agent отсутствует или неизвестен, будет `Unknown`. JA3/JA4
-и HTTP/2 fingerprint требуют отдельного наблюдения ClientHello и HTTP/2
-connection frames; их нельзя честно восстановить из одного HTTP request event.
+эвристикой. Если User-Agent отсутствует или неизвестен, будет `Unknown`.
 
 Счётчики доставки на стороне сборщика доступны через `/api/ingest`:
 `received` — прочитанные из socket датаграммы, `decoded` — корректный JSON,
@@ -175,15 +173,14 @@ connection frames; их нельзя честно восстановить из 
 
 `GET /api/report` объединяет operational summary и transport details. В отчёте
 есть отдельная сводка клиентов: число запросов и последний профиль. Для каждого
-наблюдения показывается изменение TLS/ALPN/ClientHello/JA3/JA4/HTTP2 относительно
-предыдущего события того же client IP. Рядом указываются точка наблюдения и
-состояние evidence (`http-only`, `transport-only`, `partial-wire`). При отсутствии предыдущего события или
-данных выводится `unknown`, а не mismatch. Секретные query-параметры
+наблюдения показывается изменение TLS/ALPN относительно предыдущего события того
+же client IP. Рядом указываются точка наблюдения и состояние evidence
+(`http-only`, `transport-only`). Секретные query-параметры
 редактируются на границе отчёта:
 
 ```text
-httpfin CLIENT FINGERPRINT INSPECTOR REPORT
-Evidence policy: missing fields are unknown; fingerprints are signals, not identity proof
+httpfin CLIENT OBSERVATION REPORT
+Evidence policy: missing fields are not inferred
 Observations: 1
 
 CLIENTS
@@ -198,12 +195,10 @@ OBSERVATION DETAILS
 [2026-11-25T15:43:34Z] id=15-0 client=172.17.0.1 request=GET /healthz status=204 bytes=0 duration_ms=0
   observation: point=nginx-http-module evidence=transport-only
   transport: protocol=HTTP tls=TLS 1.3 sni=inspector.example.test alpn=h2 offered_alpn=unknown
-  fingerprints: client_hello=unknown ja3=unknown ja4=unknown http2=unknown
-  fingerprint_change: no_previous_observation
+  transport_change: no_previous_observation
 ```
 
-Для отчёта важно разделять факт доставки события и наличие fingerprint:
-доставка события ещё не означает, что доступен raw ClientHello.
+Для отчёта важно разделять факт доставки события и полноту наблюдения.
 
 Отчёт создаётся синхронно при обработке `GET /api/report` из текущего
 хранилища в памяти. Сам сервис не создаёт файл в каталоге и не запускает
