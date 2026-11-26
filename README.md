@@ -42,6 +42,11 @@ The green levels are available in the current product. The dashed level is a
 future connection-level component; it is not required for the main API
 diagnostic workflow.
 
+For most QA and API-client tests, the current HTTP observations plus the TLS
+edge fields are sufficient: request, client, User-Agent, profile, status,
+timing, bytes, TLS version, SNI, ALPN, and protocol. The future connection
+observer is an optional escalation for TLS/HTTP2 fingerprint investigations.
+
 ## Why this tool is useful
 
 When an API behaves unexpectedly, a normal test shows only the status and
