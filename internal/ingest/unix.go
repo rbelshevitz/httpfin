@@ -125,7 +125,7 @@ func StartUnixDatagramWithCounters(path string, store *model.Store, handler func
 				}
 				continue
 			}
-			event := model.Connection{ID: wire.RequestID, Timestamp: time.Now().UTC(), ClientIP: wire.RemoteAddr, Method: wire.Method, URL: wire.URI, Host: wire.Host, Status: wire.Status, ElapsedMS: requestTimeMillis(wire.RequestTime), Bytes: parseBytes(wire.BytesSent), UserAgent: wire.UserAgent, TLSVersion: wire.TLSVersion, SNI: wire.SNI, ALPN: wire.ALPN, ObservationPoint: "nginx-http-module", DetectedProfile: "Unknown", UAConsistency: "Unknown", Risk: "Info", Protocol: valueOr(wire.Protocol, "HTTP")}
+			event := model.Connection{ID: wire.RequestID, Timestamp: time.Now().UTC(), ClientIP: wire.RemoteAddr, Method: wire.Method, URL: wire.URI, Host: wire.Host, Status: wire.Status, ElapsedMS: requestTimeMillis(wire.RequestTime), Bytes: parseBytes(wire.BytesSent), UserAgent: wire.UserAgent, TLSVersion: wire.TLSVersion, SNI: wire.SNI, ALPN: wire.ALPN, ObservationPoint: "nginx-http-module", DetectedProfile: "Unknown", UAConsistency: "Unknown", Protocol: valueOr(wire.Protocol, "HTTP")}
 			if event.ID == "" {
 				event.ID = fmt.Sprintf("nginx-%d", n)
 			}

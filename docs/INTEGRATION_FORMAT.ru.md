@@ -15,7 +15,7 @@ Nginx ── TLS termination, SNI/ALPN, proxy, access log
           │ best-effort JSON
           ▼
       Go httpfin
-        │ normalize, profile, baseline, store, report, UI/API
+        │ normalize, profile, store, report, UI/API
 ```
 
 ### Nginx
@@ -62,7 +62,7 @@ Nginx worker
        └─ ограниченный Unix datagram
             └─ исполняемый файл httpfin на Go
                  ├─ in-memory store
-                 ├─ profile/risk/baseline processing
+                 ├─ profile and evidence processing
                  ├─ /api/connections и /api/report
                  └─ inspector UI
 ```
@@ -101,7 +101,7 @@ Go-процесс владеет семантикой продукта:
 
 - принимает и нормализует события;
 - хранит историю;
-- строит профиль, risk и baseline;
+- строит профиль и нормализует наблюдаемые признаки;
 - выдаёт `/api/connections`, `/api/report` и UI;
 - должен быть заменяемым без пересборки Nginx-модуля.
 
@@ -156,8 +156,7 @@ Nginx не завершал TLS, модуль включён в plain HTTP serve
   "sni": "inspector.example.test",
   "alpn": "h2",
   "detected_profile": "Generic HTTP",
-  "ua_consistency": "Unknown",
-  "risk": "Info"
+  "ua_consistency": "Unknown"
 }
 ```
 
@@ -174,9 +173,8 @@ connection frames; их нельзя честно восстановить из 
 
 ### 4. Squid-style отчёт
 
-`GET /api/report` объединяет operational summary и fingerprint details. В отчёте
-есть отдельная сводка клиентов: число запросов, последний профиль и сравнение
-с baseline. Для каждого
+`GET /api/report` объединяет operational summary и transport details. В отчёте
+есть отдельная сводка клиентов: число запросов и последний профиль. Для каждого
 наблюдения показывается изменение TLS/ALPN/ClientHello/JA3/JA4/HTTP2 относительно
 предыдущего события того же client IP. Рядом указываются точка наблюдения и
 состояние evidence (`http-only`, `transport-only`, `partial-wire`). При отсутствии предыдущего события или
@@ -189,11 +187,11 @@ Evidence policy: missing fields are unknown; fingerprints are signals, not ident
 Observations: 1
 
 CLIENTS
-CLIENT                       REQUESTS LATEST PROFILE     BASELINE       EVIDENCE
+CLIENT                       REQUESTS LATEST PROFILE     EVIDENCE
 172.17.0.1                   1        Unknown            unavailable    http-only
 
 ACCESS SUMMARY
-TIME                 MS     CLIENT                       ST     BYTES    METHOD           PROFILE        RISK
+TIME                 MS     CLIENT                       ST     BYTES    METHOD           PROFILE
 2026-11-25 15:43:34  0      172.17.0.1                  204    0        GET /healthz     Unknown        Info
 
 OBSERVATION DETAILS

@@ -8,17 +8,17 @@ import (
 
 func TestBuildSnapshotSummarizesEvidenceAndFindings(t *testing.T) {
 	rows := []model.Connection{
-		{ID: "new", Timestamp: time.Unix(20, 0).UTC(), ClientIP: "203.0.113.8", UserAgent: "ExampleBrowser/1", Method: "GET", URL: "/api/items?token=secret", Status: 500, TLSVersion: "TLS 1.3", ALPN: "h2", BaselineStatus: "mismatch"},
+		{ID: "new", Timestamp: time.Unix(20, 0).UTC(), ClientIP: "203.0.113.8", UserAgent: "ExampleBrowser/1", Method: "GET", URL: "/api/items?token=secret", Status: 500, TLSVersion: "TLS 1.3", ALPN: "h2"},
 		{ID: "old", Timestamp: time.Unix(10, 0).UTC(), ClientIP: "203.0.113.8", UserAgent: "ExampleBrowser/1", Method: "GET", URL: "/api/items?token=secret", Status: 200, TLSVersion: "TLS 1.2"},
 	}
 	s := BuildSnapshot(rows, time.Unix(30, 0))
-	if s.Status != "Review" || s.Errors != 1 || s.Total != 2 {
+	if s.Status != "Degraded" || s.Errors != 1 || s.Total != 2 {
 		t.Fatalf("unexpected summary: %+v", s)
 	}
 	if s.Rate != .2 || s.Evidence.TLS != 2 || s.Evidence.ALPN != 1 {
 		t.Fatalf("unexpected rate/evidence: %+v", s)
 	}
-	if len(s.Sources) != 1 || s.Sources[0].Count != 2 || len(s.Findings) != 1 {
+	if len(s.Sources) != 1 || s.Sources[0].Count != 2 || len(s.Findings) != 0 {
 		t.Fatalf("unexpected sources/findings: %+v", s)
 	}
 	if len(s.UserAgents) != 1 || s.UserAgents[0].UserAgent != "ExampleBrowser/1" || len(s.Destinations) != 1 || s.Destinations[0].Destination != "/api/items?token=%5BREDACTED%5D" {

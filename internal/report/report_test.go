@@ -10,7 +10,7 @@ import (
 
 func TestWriteExplainsClientsAndFingerprintChanges(t *testing.T) {
 	rows := []model.Connection{
-		{ID: "new", Timestamp: time.Unix(2, 0).UTC(), ClientIP: "203.0.113.8", Method: "GET", URL: "/v1/data?token=secret&client_secret=also-secret&view=full", Status: 200, Protocol: "HTTP/2", TLSVersion: "TLS 1.3", ALPN: "h2", ClientHelloSig: "hello-new", JA3: "ja3-new", HTTP2Fingerprint: "h2-new", DetectedProfile: "Chrome-like", UserAgent: "Chrome", Risk: "Review", UAConsistency: "Mismatch", BaselineStatus: "mismatch", ReferenceProfile: "Chrome"},
+		{ID: "new", Timestamp: time.Unix(2, 0).UTC(), ClientIP: "203.0.113.8", Method: "GET", URL: "/v1/data?token=secret&client_secret=also-secret&view=full", Status: 200, Protocol: "HTTP/2", TLSVersion: "TLS 1.3", ALPN: "h2", ClientHelloSig: "hello-new", JA3: "ja3-new", HTTP2Fingerprint: "h2-new", DetectedProfile: "Chrome-like", UserAgent: "Chrome"},
 		{ID: "old", Timestamp: time.Unix(1, 0).UTC(), ClientIP: "203.0.113.8", Method: "GET", URL: "/v1/data", Status: 200, Protocol: "HTTP/2", TLSVersion: "TLS 1.2", ALPN: "h2", ClientHelloSig: "hello-old", JA3: "ja3-old", HTTP2Fingerprint: "h2-old", DetectedProfile: "Chrome-like"},
 		{ID: "other", Timestamp: time.Unix(1, 0).UTC(), ClientIP: "198.51.100.5", Method: "GET", URL: "/health", Status: 204, DetectedProfile: "Unknown"},
 	}
@@ -20,7 +20,6 @@ func TestWriteExplainsClientsAndFingerprintChanges(t *testing.T) {
 	for _, expected := range []string{
 		"CLIENTS",
 		"203.0.113.8",
-		"mismatch",
 		"fingerprint_change: tls:TLS 1.2->TLS 1.3",
 		"ja3:ja3-old->ja3-new",
 		"%5BREDACTED%5D",
@@ -87,6 +86,10 @@ func TestWriteHTMLUsesSnapshotForStaticAndLiveViews(t *testing.T) {
 	if got := static.Header().Get("Content-Disposition"); got != `attachment; filename="httpfin-report.html"` {
 		t.Fatalf("unexpected HTML disposition: %q", got)
 	}
+	page := static.Body.String()
+	if strings.Contains(page, "<th>Risk</th>") || strings.Contains(page, "<th>Baseline</th>") || strings.Contains(page, `class="legend-term">Baseline`) || strings.Contains(page, "<b>baseline</b>") {
+		t.Fatalf("status page contains removed classification fields: risk=%v baseline=%v legend=%v detail=%v", strings.Contains(page, "<th>Risk</th>"), strings.Contains(page, "<th>Baseline</th>"), strings.Contains(page, `class="legend-term">Baseline`), strings.Contains(page, "<b>baseline</b>"))
+	}
 	live := httptest.NewRecorder()
 	WriteHTML(live, snapshot, true)
 	if !strings.Contains(live.Body.String(), "new EventSource('/events')") || !strings.Contains(live.Body.String(), "api/snapshot") || !strings.Contains(live.Body.String(), "jQuery v3.7.1") || !strings.Contains(live.Body.String(), "$.getJSON") {
@@ -110,7 +113,6 @@ func BenchmarkWriteReport5000(b *testing.B) {
 			ALPN:             "h2",
 			DetectedProfile:  "Chrome Android-like",
 			UAConsistency:    "Unknown",
-			Risk:             "Info",
 			HTTP2Fingerprint: "settings",
 			ClientHelloSig:   "hello",
 		}

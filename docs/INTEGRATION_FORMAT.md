@@ -10,8 +10,7 @@ Client → Nginx → application
 
 Nginx handles data-plane work: TLS, virtual-host selection, ALPN, proxying and
 access logging. The module creates a request ID and sends a bounded,
-non-blocking event. Go normalizes, profiles, compares the baseline, stores and
-reports it.
+non-blocking event. Go normalizes, profiles, stores and reports it.
 
 The event is best-effort telemetry. The module must not wait for Go, perform
 DNS/HTTP/database work, or calculate expensive fingerprints inside an Nginx
@@ -36,7 +35,7 @@ Nginx worker
        └─ bounded Unix datagram
             └─ httpfin Go executable
                  ├─ in-memory store
-                 ├─ profile, baseline and evidence processing
+                 ├─ profile and evidence processing
                  ├─ /api/connections and /api/report
                  ├─ inspector UI
 ```
@@ -112,15 +111,15 @@ Get the Squid-style text report for an incident, rollout or API-test artifact:
 curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
 ```
 
-The text report contains an access summary, a client-level summary with the
-baseline comparison and per-observation fingerprint details. Each row
+The text report contains an access summary, a client-level summary and
+per-observation transport details. Each row
 shows the observation point and evidence state, plus changes from the previous
 observation for the same client IP; missing evidence is rendered as `unknown`,
 not as a mismatch. Sensitive query parameters are redacted at the report
 boundary. Use JSON in CI and dashboards; attach TXT to a ticket or test result.
 Empty
-JA3/JA4/HTTP/2 fields mean that the required separate TLS/HTTP2 program was
-not connected or did not provide those values.
+JA3/JA4/HTTP/2 fields are optional external values; built-in Nginx and Go paths
+do not calculate them.
 
 Reports are generated synchronously from the current in-memory store when
 `GET /api/report` is handled. No report file is created by the service. A file

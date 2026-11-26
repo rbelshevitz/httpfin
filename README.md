@@ -316,7 +316,7 @@ If Alpine cannot download packages because of DNS, retry the build with
 - [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md) — TLS, certificates, and Nginx modes;
 - [`docs/INTEGRATION_FORMAT.md`](docs/INTEGRATION_FORMAT.md) — module events and report format;
 - [`docs/DEVOPS_RUNBOOK.md`](docs/DEVOPS_RUNBOOK.md) — operational troubleshooting;
-- [`docs/OBSERVATION_SEMANTICS.md`](docs/OBSERVATION_SEMANTICS.md) — exact semantics of Risk, Baseline, and evidence;
+- [`docs/OBSERVATION_SEMANTICS.md`](docs/OBSERVATION_SEMANTICS.md) — semantics of observed HTTP and transport evidence;
 - [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md) — security and reliability audit;
 - [`TODO.md`](TODO.md) — current work plan.
 

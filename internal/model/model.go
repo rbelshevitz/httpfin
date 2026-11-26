@@ -29,7 +29,9 @@ type Connection struct {
 	HTTP2Fingerprint  string    `json:"http2_fingerprint"`
 	DetectedProfile   string    `json:"detected_profile"`
 	UAConsistency     string    `json:"ua_consistency"`
-	Risk              string    `json:"risk"`
+	// Deprecated compatibility fields. httpfin does not calculate or display
+	// risk/baseline decisions.
+	Risk              string    `json:"risk,omitempty"`
 	ReferenceProfile  string    `json:"reference_profile,omitempty"`
 	ReferenceVersion  string    `json:"reference_version,omitempty"`
 	ReferenceSource   string    `json:"reference_source,omitempty"`

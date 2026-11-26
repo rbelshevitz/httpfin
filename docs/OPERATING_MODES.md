@@ -134,10 +134,10 @@ behavior, and recovery before it is considered production-ready.
 
 - DevOps/SRE: compare direct and ingress requests after changes to TLS,
   HTTP/2, real IP, proxy protocol, or upstream routing.
-- API QA: keep baselines for curl, curl-impersonate, SDKs, and browsers; compare
-  transport behavior as well as response bodies.
-- Security: use fingerprints as triage signals and combine them with rate,
-  authentication, IP reputation, and application logs.
+- API QA: keep exported reports for curl, curl-impersonate, SDKs, and browsers;
+  compare transport behavior as well as response bodies.
+- Security: use available request and transport fields as triage signals and
+  combine them with rate, authentication, IP reputation, and application logs.
 - Incident response: preserve `/api/report`, `/api/ingest`, access logs, Nginx version, and
   OpenSSL version together so a transport change can be reproduced.
 

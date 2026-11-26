@@ -42,7 +42,6 @@ type SourceSummary struct {
 	LastSeen  time.Time `json:"last_seen"`
 	Profile   string    `json:"profile,omitempty"`
 	Evidence  string    `json:"evidence"`
-	Baseline  string    `json:"baseline,omitempty"`
 }
 
 type UserAgentSummary struct {
@@ -173,9 +172,6 @@ func BuildSnapshot(rows []model.Connection, now time.Time) Snapshot {
 		}
 		if entry.UserAgent == "" {
 			entry.UserAgent = c.UserAgent
-		}
-		if entry.Baseline == "" {
-			entry.Baseline = c.BaselineStatus
 		}
 		entry.Evidence = evidenceState(c)
 		ua := c.UserAgent
@@ -308,15 +304,7 @@ func browserFamily(userAgent, profile string) string {
 	}
 }
 
-func findings(rows []model.Connection) []Finding {
-	var out []Finding
-	for _, c := range rows {
-		if c.BaselineStatus == "mismatch" {
-			out = append(out, Finding{ID: "baseline-" + c.ID, Kind: "baseline_mismatch", Severity: "high", Title: "Baseline mismatch", Explanation: "Observed signature differs from the selected baseline.", Count: 1, Source: fingerprint.Dash(c.ClientIP), FirstSeen: c.Timestamp, LastSeen: c.Timestamp, Action: "Compare the request with the expected client and review the observation point."})
-		}
-	}
-	return out
-}
+func findings(_ []model.Connection) []Finding { return nil }
 
 func statusClass(code int) string {
 	switch {

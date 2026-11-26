@@ -57,7 +57,7 @@ operational integration matter more than raw ClientHello data.
 
 ## Regression testing
 
-Store a baseline containing the client, library/browser version, Nginx/OpenSSL
+Export a report containing the client, library/browser version, Nginx/OpenSSL
 version and observation date. Re-run after upgrades and review drift instead
 of treating every change as abuse.
 

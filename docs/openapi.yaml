@@ -51,7 +51,6 @@ components:
         - status
         - protocol
         - detected_profile
-        - risk
       properties:
         id: {type: string}
         timestamp: {type: string, format: date-time}
@@ -78,8 +77,3 @@ components:
         http2_fingerprint: {type: string}
         detected_profile: {type: string}
         ua_consistency: {type: string}
-        risk: {type: string, enum: [Low, Info, Review, High]}
-        reference_profile: {type: string}
-        reference_version: {type: string}
-        reference_source: {type: string}
-        baseline_status: {type: string, enum: [matched, mismatch, unknown]}

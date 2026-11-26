@@ -26,14 +26,13 @@ func Write(w http.ResponseWriter, rows []model.Connection) {
 	writeClients(w, rows)
 	fmt.Fprintln(w, "\nACCESS SUMMARY")
 	fmt.Fprintln(w, strings.Repeat("-", 118))
-	fmt.Fprintf(w, "%-20s %-6s %-28s %-3s %-8s %-34s %-16s %-12s\n", "TIME", "MS", "CLIENT", "ST", "BYTES", "REQUEST", "PROFILE", "RISK")
+	fmt.Fprintf(w, "%-20s %-6s %-28s %-3s %-8s %-34s %-16s\n", "TIME", "MS", "CLIENT", "ST", "BYTES", "REQUEST", "PROFILE")
 	for _, c := range rows {
 		request := c.Method + " " + redactURL(c.URL)
-		fmt.Fprintf(w, "%-20s %-6d %-28s %-3d %-8d %-34s %-16s %-12s\n",
+		fmt.Fprintf(w, "%-20s %-6d %-28s %-3d %-8d %-34s %-16s\n",
 			c.Timestamp.Format("2006-01-02 15:04:05"), c.ElapsedMS,
 			fingerprint.Truncate(fingerprint.Dash(c.ClientIP), 28), c.Status, c.Bytes,
-			fingerprint.Truncate(request, 34), fingerprint.Truncate(fingerprint.Dash(c.DetectedProfile), 16),
-			fingerprint.Truncate(fingerprint.Dash(c.Risk), 12))
+			fingerprint.Truncate(request, 34), fingerprint.Truncate(fingerprint.Dash(c.DetectedProfile), 16))
 	}
 
 	fmt.Fprintln(w, "\nOBSERVATION DETAILS")
@@ -45,11 +44,9 @@ func Write(w http.ResponseWriter, rows []model.Connection) {
 
 func writeSummary(w interface{ Write([]byte) (int, error) }, rows []model.Connection) {
 	status := make(map[int]int)
-	risk := make(map[string]int)
 	unknownTLS, unknownJA3, unknownH2 := 0, 0, 0
 	for _, c := range rows {
 		status[c.Status]++
-		risk[fingerprint.Dash(c.Risk)]++
 		if c.TLSVersion == "" {
 			unknownTLS++
 		}
@@ -62,7 +59,6 @@ func writeSummary(w interface{ Write([]byte) (int, error) }, rows []model.Connec
 	}
 	fmt.Fprintln(w, "SUMMARY")
 	fmt.Fprintf(w, "  statuses: %s\n", formatCounts(status))
-	fmt.Fprintf(w, "  risks: %s\n", formatStringCounts(risk))
 	fmt.Fprintf(w, "  evidence unknown: tls=%d/%d ja3=%d/%d http2=%d/%d\n", unknownTLS, len(rows), unknownJA3, len(rows), unknownH2, len(rows))
 }
 
@@ -88,10 +84,10 @@ func writeClients(w interface{ Write([]byte) (int, error) }, rows []model.Connec
 	sort.Strings(keys)
 	fmt.Fprintln(w, "\nCLIENTS")
 	fmt.Fprintln(w, strings.Repeat("-", 118))
-	fmt.Fprintf(w, "%-28s %-8s %-18s %-12s %-12s\n", "CLIENT", "REQUESTS", "LATEST PROFILE", "BASELINE", "EVIDENCE")
+	fmt.Fprintf(w, "%-28s %-8s %-18s %-12s\n", "CLIENT", "REQUESTS", "LATEST PROFILE", "EVIDENCE")
 	for _, key := range keys {
 		c := clients[key]
-		fmt.Fprintf(w, "%-28s %-8d %-18s %-12s %-12s\n", fingerprint.Truncate(key, 28), c.count, fingerprint.Truncate(unknown(c.latest.DetectedProfile), 18), fingerprint.Truncate(comparisonStatus(c.latest), 12), evidenceState(c.latest))
+		fmt.Fprintf(w, "%-28s %-8d %-18s %-12s\n", fingerprint.Truncate(key, 28), c.count, fingerprint.Truncate(unknown(c.latest.DetectedProfile), 18), evidenceState(c.latest))
 	}
 	if len(keys) == 0 {
 		fmt.Fprintln(w, "No observations yet.")
@@ -110,8 +106,6 @@ func writeObservation(w interface{ Write([]byte) (int, error) }, c model.Connect
 	fmt.Fprintf(w, "  declared: user_agent=%s profile=%s\n",
 		unknown(fingerprint.Truncate(c.UserAgent, 96)), unknown(c.DetectedProfile))
 	fmt.Fprintf(w, "  fingerprint_change: %s\n", fingerprintChanges(c, previous))
-	fmt.Fprintf(w, "  comparison: status=%s reference=%s/%s source=%s explanation=%s\n",
-		comparisonStatus(c), unknown(c.ReferenceProfile), unknown(c.ReferenceVersion), unknown(c.ReferenceSource), explanation(c))
 }
 
 func evidenceState(c model.Connection) string {
@@ -153,29 +147,6 @@ func fingerprintChanges(current model.Connection, previous *model.Connection) st
 		return "unchanged"
 	}
 	return strings.Join(changes, ", ")
-}
-
-func comparisonStatus(c model.Connection) string {
-	if c.BaselineStatus != "" {
-		return c.BaselineStatus
-	}
-	if c.ClientHelloSig == "" {
-		return "unavailable"
-	}
-	return "unknown"
-}
-
-func explanation(c model.Connection) string {
-	switch c.BaselineStatus {
-	case "matched":
-		return "observed signature agrees with the selected baseline"
-	case "mismatch":
-		return "declared profile differs from the known baseline; review with endpoint and behavior context"
-	case "unknown":
-		return "signature was observed but is not present in the selected baseline"
-	default:
-		return "insufficient wire-level evidence for a baseline comparison"
-	}
 }
 
 func unknown(value string) string {

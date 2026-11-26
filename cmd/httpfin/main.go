@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"httpfin/internal/baseline"
 	"httpfin/internal/demo"
 	"httpfin/internal/fingerprint"
 	"httpfin/internal/ingest"
@@ -28,13 +27,8 @@ func main() {
 	}
 	store := model.NewStore(initial)
 	ingestCounters := ingest.NewCounters()
-	clientBaseline, err := baseline.Load(os.Getenv("httpfin_baseline_file"))
-	if err != nil {
-		log.Printf("baseline disabled: %v", err)
-	}
 	nginxEventHandler := func(c model.Connection) {
 		c.DetectedProfile = fingerprint.ProfileFromUA(c.UserAgent)
-		c = clientBaseline.Observe(c)
 		store.Add(c)
 	}
 	stopIngest, ingestHealthy, err := ingest.StartUnixDatagramWithCounters(os.Getenv("httpfin_socket"), store, nginxEventHandler, ingestCounters)
@@ -89,7 +83,7 @@ func main() {
 			log.Printf("httpfin inspector listening on https://%s (SNI + ALPN capture enabled)", tlsAddr)
 			tlsServer = &http.Server{
 				Addr:              tlsAddr,
-				Handler:           NewTLSHandler(mux, store, observer, clientBaseline),
+				Handler:           NewTLSHandler(mux, store, observer),
 				TLSConfig:         config,
 				ReadHeaderTimeout: 5 * time.Second,
 				ReadTimeout:       15 * time.Second,

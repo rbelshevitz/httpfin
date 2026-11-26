@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"httpfin/internal/baseline"
 	"httpfin/internal/fingerprint"
 	"httpfin/internal/model"
 	"httpfin/internal/tlsinspect"
@@ -22,17 +21,17 @@ func requestLogger(next http.Handler, store *model.Store) http.Handler {
 			return
 		}
 		ua := r.UserAgent()
-		c := model.Connection{ID: fmt.Sprintf("http-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ElapsedMS: time.Since(started).Milliseconds(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), Status: recorder.status, Bytes: int64(recorder.bytes), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-http", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Unknown", Risk: "Info"}
+		c := model.Connection{ID: fmt.Sprintf("http-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ElapsedMS: time.Since(started).Milliseconds(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), Status: recorder.status, Bytes: int64(recorder.bytes), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-http", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Unknown"}
 		store.Add(c)
 	})
 }
 
 // NewTLSHandler is the integration point for an HTTPS listener that terminates TLS in Go.
-func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.Observer, clientBaseline *baseline.Set) http.Handler {
+func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.Observer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		ua := r.UserAgent()
-		c := model.Connection{ID: fmt.Sprintf("tls-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-tls", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Unknown", Risk: "Low"}
+		c := model.Connection{ID: fmt.Sprintf("tls-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-tls", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Unknown"}
 		if r.TLS != nil {
 			c.TLSVersion = fingerprint.TLSVersionName(r.TLS.Version)
 			c.ALPN = r.TLS.NegotiatedProtocol
@@ -42,7 +41,6 @@ func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.O
 				c.ALPNOffered = hello.OfferedALPN
 				c.ClientHelloSig = hello.Signature
 			}
-			c = clientBaseline.Observe(c)
 		}
 		writer := &captureWriter{ResponseWriter: w, c: &c}
 		next.ServeHTTP(writer, r)
