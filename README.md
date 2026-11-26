@@ -1,4 +1,4 @@
-# httpfin: HTTP client observation
+# httpfin: see what actually reached your API
 
 [![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Nginx](https://img.shields.io/badge/Nginx-1.28.3-009639?logo=nginx&logoColor=white)](Dockerfile)
@@ -6,14 +6,16 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 [![CI](https://github.com/rbelshevitz/httpfin/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbelshevitz/httpfin/actions/workflows/ci.yml)
 
-> **Observe the client. Explain the path.**
+> **The test passed. The API disagreed. See what actually arrived.**
 
-`httpfin` is a diagnostic service for an API edge. It records the HTTP client,
-request, response, protocol, TLS, and observation-point signals visible at that
-edge, then presents them through a JSON API, UI, and readable text report.
+`httpfin` is a small diagnostic station for an API edge. Put it beside the
+entry point, send the same request from different clients, and see what the
+edge actually received: client, User-Agent, route, status, timing, HTTP
+protocol, and the TLS fields visible at that point.
 
-Use it to compare browsers, SDKs, proxies, ingress changes, and reference
-traffic from `curl-impersonate` at the same observation point.
+It turns “works in the browser, fails in the SDK” into a short comparison
+instead of a long argument. Compare browsers, SDKs, proxies, ingress changes,
+and reference traffic from `curl-impersonate` at the same observation point.
 
 ## What httpfin can see
 
@@ -47,16 +49,16 @@ edge fields are sufficient: request, client, User-Agent, profile, status,
 timing, bytes, TLS version, SNI, ALPN, and protocol. The future connection
 observer is an optional escalation for TLS/HTTP2 fingerprint investigations.
 
-## Why this tool is useful
+## Why it is useful
 
-When an API behaves unexpectedly, a normal test shows only the status and
-response body. `httpfin` shows what reached the entry point: which client sent
-the request, its declared User-Agent, the resulting profile, visible TLS
-signals, and what changed from the previous request.
+When an API behaves unexpectedly, the response body is only half the story.
+`httpfin` puts the request on the bench: who sent it, where it went, which
+User-Agent it declared, what profile was inferred, which TLS signals were
+visible, and what changed from the previous request.
 
-This helps separate an API problem from a browser, SDK, proxy, TLS, or Nginx
-change. The result can be saved as a readable report for QA, developers, or
-DevOps.
+That helps separate an API bug from a browser, SDK, proxy, TLS, or Nginx
+change. The same observation is available as JSON, a compact UI, and a report
+that QA, developers, and DevOps can attach to an investigation.
 
 ## Do you need the Nginx module?
 
