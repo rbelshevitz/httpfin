@@ -1,53 +1,23 @@
 package main
 
 import (
+	"httpfin/internal/model"
+	"httpfin/internal/report"
 	"net/http"
-	"strings"
+	"time"
 )
 
-func webHandler() http.Handler {
+func webHandler(stores ...*model.Store) http.Handler {
+	store := model.NewStore(nil)
+	if len(stores) > 0 && stores[0] != nil {
+		store = stores[0]
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		// The UI template is intentionally embedded as one small static asset.
-		// Reset its illustrative defaults before the browser fills them from the
-		// API; production must never display demo TLS/fingerprint evidence.
-		html := strings.NewReplacer(
-			"<b>94</b>", "<b>—</b>",
-			"<h3 id=\"profile\">Chrome-like</h3><p>High confidence browser signature</p>", "<h3 id=\"profile\">No selection</h3><p>No observation selected</p>",
-			"TLS 1.3 <i class=\"check\">✓</i>", "Not observed",
-			"h2 <i class=\"check\">✓</i>", "Not observed",
-			"Available <i class=\"check\">✓</i>", "Not observed",
-		).Replace(indexHTML)
-		html = strings.Replace(html, "</body>", `<script>
-(function () {
-  function metric(label, value) {
-    document.querySelectorAll('.metric').forEach(function (item) {
-      var name = item.querySelector('label');
-      if (name && name.textContent === label) {
-        var target = item.querySelector('.value');
-        if (target) target.textContent = value || 'Not observed';
-      }
-    });
-  }
-  function render(item) {
-    document.querySelector('#profile').textContent = item ? (item.detected_profile || 'Unknown') : 'No selection';
-    document.querySelector('.ring b').textContent = '—';
-    document.querySelector('.score p').textContent = item ? 'Observed profile; confidence is not inferred here' : 'No observation selected';
-    metric('TLS version', item && item.tls_version);
-    metric('ALPN', item && item.alpn);
-    metric('JA3 fingerprint', item && item.ja3 ? 'Available' : 'Not observed');
-    metric('JA4 fingerprint', item && item.ja4 ? 'Available' : 'Not observed');
-    metric('HTTP/2 fingerprint', item && item.http2_fingerprint ? 'Available' : 'Not observed');
-  }
-  render(null);
-  fetch('/api/connections').then(function (response) { return response.json(); }).then(function (items) { render(items[0]); }).catch(function () { render(null); });
-}());
-</script></body>`, 1)
-		_, _ = w.Write([]byte(html))
+		report.WriteHTML(w, report.BuildSnapshot(store.List(), time.Now()), true)
 	})
 }
 

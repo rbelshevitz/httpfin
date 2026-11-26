@@ -14,11 +14,15 @@ httpfin_socket=/run/httpfin/events.sock \
 httpfin_socket_group=nobody \
 /usr/local/bin/httpfin &
 httpfin_pid=$!
+/usr/local/bin/httpfin-mockapi &
+mockapi_pid=$!
 nginx_pid=
 cleanup() {
 	kill "$httpfin_pid" 2>/dev/null || true
+	kill "$mockapi_pid" 2>/dev/null || true
 	if [ -n "$nginx_pid" ]; then kill "$nginx_pid" 2>/dev/null || true; fi
 	wait "$httpfin_pid" 2>/dev/null || true
+	wait "$mockapi_pid" 2>/dev/null || true
 	if [ -n "$nginx_pid" ]; then wait "$nginx_pid" 2>/dev/null || true; fi
 }
 trap cleanup EXIT INT TERM

@@ -45,13 +45,18 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/connections", connectionsHandler(store))
 	mux.HandleFunc("/api/report", reportHandler(store))
+	mux.HandleFunc("/api/report.html", htmlReportHandler(store))
+	mux.HandleFunc("/events", eventsHandler(store))
+	mux.HandleFunc("/api/snapshot", snapshotHandler(store))
+	mux.HandleFunc("/report", htmlReportHandler(store))
+	mux.HandleFunc("/report/material-symbols.woff2", materialSymbolsHandler)
 	mux.HandleFunc("/healthz", healthHandler(ingestHealthy))
 	if os.Getenv("httpfin_test_endpoint") == "1" {
 		mux.HandleFunc("/__httpfin_test/unauthorized", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
 		})
 	}
-	mux.Handle("/", webHandler())
+	mux.Handle("/", webHandler(store))
 
 	// The collector API is intended to be reached through Nginx or a private
 	// control plane. Bind loopback by default; explicitly opt into a wider bind.
@@ -63,9 +68,11 @@ func main() {
 		Handler:           requestLogger(mux, store),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    64 << 10,
+		// The dashboard SSE stream is intentionally long-lived. Per-client
+		// delivery is bounded in Store, so a slow browser cannot block ingest.
+		WriteTimeout:   0,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 64 << 10,
 	}
 	go func() { errCh <- plainServer.ListenAndServe() }()
 	var tlsServer *http.Server
@@ -84,7 +91,7 @@ func main() {
 				TLSConfig:         config,
 				ReadHeaderTimeout: 5 * time.Second,
 				ReadTimeout:       15 * time.Second,
-				WriteTimeout:      30 * time.Second,
+				WriteTimeout:      0,
 				IdleTimeout:       60 * time.Second,
 				MaxHeaderBytes:    64 << 10,
 			}

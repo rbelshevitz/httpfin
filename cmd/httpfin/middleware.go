@@ -18,7 +18,7 @@ func requestLogger(next http.Handler, store *model.Store) http.Handler {
 		started := time.Now()
 		recorder := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
-		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/healthz" {
+		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/healthz" || r.URL.Path == "/" || r.URL.Path == "/report" {
 			return
 		}
 		ua := r.UserAgent()
@@ -32,7 +32,7 @@ func NewTLSHandler(next http.Handler, store *model.Store, observer *tlsinspect.O
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		ua := r.UserAgent()
-		c := model.Connection{ID: fmt.Sprintf("tls-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-tls", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Matched", Risk: "Low"}
+		c := model.Connection{ID: fmt.Sprintf("tls-%d", time.Now().UnixNano()), Timestamp: started.UTC(), ClientIP: fingerprint.ClientIP(r), Method: r.Method, URL: r.URL.RequestURI(), UserAgent: ua, Protocol: r.Proto, ObservationPoint: "go-tls", DetectedProfile: fingerprint.ProfileFromUA(ua), UAConsistency: "Unknown", Risk: "Low"}
 		if r.TLS != nil {
 			c.TLSVersion = fingerprint.TLSVersionName(r.TLS.Version)
 			c.ALPN = r.TLS.NegotiatedProtocol

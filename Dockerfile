@@ -6,7 +6,8 @@ WORKDIR /src
 COPY go.mod ./
 COPY cmd ./cmd
 COPY internal ./internal
-RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/httpfin ./cmd/httpfin
+RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/httpfin ./cmd/httpfin \
+ && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/mockapi ./cmd/mockapi
 
 FROM alpine:${ALPINE_VERSION} AS nginx-build
 ARG NGINX_VERSION
@@ -35,6 +36,7 @@ FROM alpine:${ALPINE_VERSION}
 ARG NGINX_VERSION
 RUN apk add --no-cache ca-certificates openssl pcre2 zlib
 COPY --from=go-build /out/httpfin /usr/local/bin/httpfin
+COPY --from=go-build /out/mockapi /usr/local/bin/httpfin-mockapi
 COPY --from=nginx-build /src/nginx-${NGINX_VERSION}/objs/ngx_http_httpfin_module.so /usr/lib/nginx/modules/ngx_http_httpfin_module.so
 COPY --from=nginx-build /src/nginx-${NGINX_VERSION}/objs/nginx /usr/sbin/nginx
 COPY docker/nginx.conf /etc/nginx/nginx.conf

@@ -72,6 +72,10 @@ printf '%s\n' "$body" | grep -Fq '"tls_version":"TLSv1.3"'
 printf '%s\n' "$body" | grep -Fq '"sni":"inspector.example.test"'
 printf '%s\n' "$body" | grep -Fq '"alpn":"h2"'
 
+mock=$(curl -kfsS --resolve inspector.example.test:8443:127.0.0.1 \
+	${curl_http2_args} https://inspector.example.test:8443/app/api/catalog)
+printf '%s\n' "$mock" | grep -Fq 'httpfin-mock-api'
+
 logs=$($compose logs --no-color httpfin)
 printf '%s\n' "$logs" | grep -Fq '"sni":"inspector.example.test"'
 printf '%s\n' "$logs" | grep -Eq '"alpn":"(h2|http/1.1)"'

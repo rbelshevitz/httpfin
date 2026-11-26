@@ -28,18 +28,80 @@ This helps separate an API problem from a browser, SDK, proxy, TLS, or Nginx
 change. The result can be saved as a readable report for QA, developers, or
 DevOps.
 
-## Quick start
+## Quick start: useful deployment
+
+The useful result comes from sending application traffic through Nginx with
+the `httpfin` module enabled. The Go collector is not a reverse proxy and does
+not connect to your application by itself.
+
+In the first terminal, start the collector on a private address:
 
 ```bash
+httpfin_addr=127.0.0.1:8080 \
+httpfin_socket=/run/httpfin/events.sock \
 go run ./cmd/httpfin
+```
+
+Before starting it, create `/run/httpfin` and grant the Nginx worker access to
+the socket. Ready-to-use systemd unit and environment files are in
+`deploy/systemd/`; the operating-modes guide covers the permission details.
+
+In Nginx, point the module at the same Unix socket and enable it on the server
+or location that proxies requests to your application:
+
+```nginx
+httpfin_socket /run/httpfin/events.sock;
+
+server {
+    listen 443 ssl;
+    server_name api.example.test;
+
+    httpfin on;
+    location / {
+        proxy_pass http://your_application;
+    }
+}
+```
+
+See [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md) for module
+installation, socket permissions, and TLS configuration.
+
+Now send a request through the application's entry point:
+
+```bash
+curl -fsS https://api.example.test/health \
+  -H 'User-Agent: QA-client/1.0'
+```
+
+Verify that the request reached the collector and save reports:
+
+```bash
 curl -fsS http://127.0.0.1:8080/healthz
 curl -fsS http://127.0.0.1:8080/api/connections
 curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
+curl -fsS http://127.0.0.1:8080/report > httpfin-report.html
 ```
 
-Open <http://127.0.0.1:8080/> for the UI. By default the collector listens only
-on `127.0.0.1:8080` and keeps a bounded number of recent observations in memory.
+Open the status dashboard on port `8080` at <http://127.0.0.1:8080/>. The
+standalone HTML snapshot is available at <http://127.0.0.1:8080/report>, the
+aggregated snapshot at `/api/snapshot`, and live events at `/events` (SSE).
+The dashboard shows recent observations, the detection point, transport
+evidence, and details for the selected record.
+
+By default the collector listens only on `127.0.0.1:8080` and keeps a bounded
+number of recent observations in memory.
 Synthetic demo records are enabled only with `httpfin_demo=1`.
+
+### Direct local mode
+
+To inspect HTTP/TLS fields without Nginx or a real application, run `httpfin`
+as a standalone Go listener. This is a local diagnostic mode, not production
+traffic proxying:
+
+```bash
+go run ./cmd/httpfin
+curl -v http://127.0.0.1:8080/healthz
+```
 
 ## Main deployment
 
@@ -65,25 +127,84 @@ write a report file; save the response by redirecting command output.
 - changes between sequential observations;
 - a JSON API, UI, and text report.
 
-Timing and response size come from the direct Go mode or the Nginx access log.
-The current Nginx HTTP module does not include them in its event.
+In direct Go mode, timing and response size are stored in the observation. Nginx
+can provide these values in its access log, but the current HTTP module does
+not include them in the httpfin event, so they do not enter its report
+automatically.
 
 ## Important limits
 
-`ClientHello` is the first TLS message sent by a client. It contains offered
-TLS versions, cipher suites, and extensions. In the ordinary Nginx HTTP phase
-it is no longer available, so the module does not calculate standard JA3/JA4
-or observe connection-level HTTP/2 settings.
+The available fields depend on the observation point. An empty field means
+“not observed at this point”, not that the client is invalid.
 
-With TLS passthrough, Nginx only forwards encrypted data. `httpfin` cannot see
-the URL, headers, User-Agent, or response status there. `ssl_preread` can expose
-SNI and offered ALPN for routing, but not a complete ClientHello fingerprint.
+### Nginx HTTP module
 
-User-Agent and profiles can be spoofed. A missing signal means that it was not
-available at the selected observation point; it is not a mismatch. The report
-is for diagnosis, not for blocking or identity verification.
+After TLS termination, the module sees Nginx request-level data: method, URI,
+User-Agent, source address, final HTTP status, negotiated TLS version, SNI,
+and ALPN. It sends the event to Go after request processing through a
+non-blocking Unix datagram.
+
+At that stage the original `ClientHello` is no longer available. Therefore the
+current module:
+
+- does not calculate standard JA3 or JA4;
+- does not collect an HTTP/2 fingerprint or connection settings;
+- does not include `elapsed_ms`, response size, or response headers in its event.
+
+Timing and response size can be obtained separately from the Nginx access log.
+They will not appear in an httpfin record until they are added to the event
+contract.
+
+### Direct Go TLS
+
+When `httpfin` terminates HTTPS itself, it additionally records the negotiated
+TLS version, SNI, selected ALPN, the client's offered ALPN list, and an
+internal `ClientHello` signature. This signature is a local SHA-256 over selected
+Go `ClientHelloInfo` fields; it is not standard JA3 or JA4. In this mode httpfin
+also measures response time and size.
+
+### TLS passthrough
+
+With TLS passthrough, Nginx does not terminate TLS and only forwards the
+encrypted stream. The httpfin HTTP module cannot see the URL, headers,
+User-Agent, or response status in that path. `ssl_preread` can expose SNI,
+offered ALPN, and the advertised TLS version to Nginx for routing, but the
+current httpfin version does not ingest those stream fields as a full
+observation.
+
+User-Agent and the profile inferred from it are client-declared or heuristic
+signals and can be spoofed. TLS fields describe what reached the selected
+termination point; they do not prove client identity. Reports are for
+diagnostics, not authentication or blocking.
 
 ## Docker
+
+The Docker image is a **demo/smoke image**. It contains Nginx, httpfin, and a
+small mock API. It is not a production backend and does not connect to your
+business application.
+
+Nginx accepts HTTPS on `8443`, sends events to Go over a Unix socket, and
+proxies `/app/` requests to the built-in mock API at `127.0.0.1:9000`. The
+httpfin status dashboard and API remain available on the other routes.
+
+This verifies TLS termination, the Nginx module, event delivery, an application
+request, and reporting. Try it immediately after startup:
+
+```bash
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/app/api/catalog
+curl -k --resolve inspector.example.test:8443:127.0.0.1 -X POST \
+  https://inspector.example.test:8443/app/login
+```
+
+To observe a real application, replace `proxy_pass` in the Nginx configuration
+with the API upstream and keep a separate route to the collector for the status
+dashboard and reports.
+
+In the Docker smoke setup, Nginx exposes the status dashboard and API over
+HTTPS on port `8443` at
+<https://inspector.example.test:8443/>. The direct collector dashboard uses
+port `8080` instead.
 
 ```bash
 docker compose up --build
@@ -117,6 +238,7 @@ If Alpine cannot download packages because of DNS, retry the build with
 - [`docs/INTEGRATION_FORMAT.md`](docs/INTEGRATION_FORMAT.md) — module events and report format;
 - [`docs/WIRE_OBSERVER.md`](docs/WIRE_OBSERVER.md) — ClientHello and HTTP/2 boundaries;
 - [`docs/DEVOPS_RUNBOOK.md`](docs/DEVOPS_RUNBOOK.md) — operational troubleshooting;
+- [`docs/OBSERVATION_SEMANTICS.md`](docs/OBSERVATION_SEMANTICS.md) — exact semantics of Risk, Baseline, and evidence;
 - [`TODO.md`](TODO.md) — current work plan.
 
 ## Development checks

@@ -32,7 +32,11 @@ curl_chrome116 -v http://127.0.0.1:8080/diagnostic
 
 ## 2. Проверка входящих клиентов на API
 
-httpfin можно поставить перед тестовым API как отдельный ingress/sidecar или встроить middleware в Go-сервис. Для каждого запроса сохраняются timestamp, elapsed, client IP, method, URL, status, bytes, protocol, User-Agent и профиль клиента.
+httpfin можно поставить перед тестовым API как отдельный ingress/sidecar или
+встроить как middleware в Go-сервис.
+
+Для каждого запроса сохраняются timestamp, elapsed, client IP, method, URL,
+status, bytes, protocol, User-Agent и профиль клиента.
 
 Минимальный тестовый маршрут:
 
@@ -41,7 +45,9 @@ handler := httpfin.NewTLSHandler(apiHandler, store, tlsinspect.NewObserver())
 http.ListenAndServeTLS(":8443", "server.crt", "server.key", handler)
 ```
 
-В production лучше не смешивать debug-панель и боевую auth-зону. Отправляйте в httpfin только нужные поля, маскируйте query-параметры с секретами и задавайте короткое retention window.
+В production не смешивайте debug-панель с боевой auth-зоной. Передавайте в
+httpfin только нужные поля, маскируйте секреты в query-параметрах и задавайте
+короткий срок хранения.
 
 ## 3. Проверка заявленного браузера
 
@@ -67,7 +73,9 @@ curl_ff117 --compressed -v https://inspector.example.test/fixture
 curl_safari15_5 --compressed -v https://inspector.example.test/fixture
 ```
 
-После обновления Nginx, OpenSSL, HTTP/2 proxy или `curl-impersonate` сравнить экспорт `/api/report`. Изменение fingerprint не всегда означает поломку, но его нужно зафиксировать как изменение сетевого поведения.
+После обновления Nginx, OpenSSL, HTTP/2 proxy или `curl-impersonate` сравните
+экспорт `/api/report`. Изменение fingerprint не всегда означает поломку, но
+его следует зафиксировать как изменение сетевого поведения.
 
 Важно: baseline привязывается к версии. Новый Chrome или новый wrapper может
 законно изменить JA3/JA4, поэтому сравнение показывает `mismatch` или `unknown`
@@ -75,7 +83,9 @@ curl_safari15_5 --compressed -v https://inspector.example.test/fixture
 
 ## 5. Nginx reverse proxy и потеря данных
 
-Если Nginx терминирует TLS, backend видит уже расшифрованный HTTP. Поэтому access log передаёт полезные request-level поля, но не весь исходный ClientHello.
+Если Nginx терминирует TLS, backend видит уже расшифрованный HTTP. Поэтому
+access log передаёт полезные request-level поля, но не весь исходный
+ClientHello.
 
 Для обычной диагностики включить `configs/nginx/httpfin.conf` и проверить:
 
@@ -84,14 +94,28 @@ curl_safari15_5 --compressed -v https://inspector.example.test/fixture
 - `$server_protocol`, `$ssl_protocol`, `$ssl_alpn_protocol`;
 - `$http_user_agent` и request ID.
 
-Если нужен SNI/ALPN до TLS termination, смотреть в сторону `stream_ssl_preread`. Встроенный TLS listener httpfin использует Go `GetConfigForClient` и сохраняет SNI, предложенный ALPN и стабильную подпись наблюдаемых ClientHello-параметров. Для строгого JA3/JA4 нужен отдельный parser всех полей ClientHello; один access log Nginx для этого недостаточен.
+Если SNI или ALPN нужны до TLS termination, используйте
+`stream_ssl_preread`.
+
+Встроенный TLS listener httpfin использует Go `GetConfigForClient` и сохраняет
+SNI, предложенный ALPN и стабильную подпись наблюдаемых параметров
+ClientHello.
+
+Для строгого JA3/JA4 нужен отдельный parser всех полей ClientHello. Одного
+access log Nginx для этого недостаточно.
 
 ### Что происходит при TLS и SNI
 
 1. Клиент сначала отправляет `ClientHello`, где может быть SNI и список ALPN.
-2. В режиме `http { listen 443 ssl; }` Nginx принимает ClientHello, выбирает сертификат/виртуальный server, завершает TLS и затем видит HTTP.
-3. В режиме `stream { ssl_preread on; }` Nginx читает ClientHello без расшифровки и может маршрутизировать по SNI/ALPN, но HTTP method, URL, status и User-Agent недоступны.
-4. После TLS termination исходный ClientHello уже не передаётся в upstream автоматически. Для JA3/JA4 нужен отдельный сборщик или parser до termination. Текущий Nginx-модуль передаёт TLS version, SNI и ALPN, но не выдаёт JA3/JA4 из HTTP-фазы.
+2. В режиме `http { listen 443 ssl; }` Nginx принимает ClientHello, выбирает
+   сертификат и виртуальный server, завершает TLS, а затем видит HTTP.
+3. В режиме `stream { ssl_preread on; }` Nginx читает ClientHello без
+   расшифровки и может маршрутизировать по SNI/ALPN. HTTP method, URL, status и
+   User-Agent в этом режиме недоступны.
+4. После TLS termination исходный ClientHello уже не передаётся в upstream
+   автоматически. Для JA3/JA4 нужен отдельный сборщик до termination. Текущий
+   Nginx-модуль передаёт TLS version, SNI и ALPN, но не выдаёт JA3/JA4 из
+   HTTP-фазы.
 
 Для проверки встроенного TLS listener:
 
@@ -101,18 +125,30 @@ curl -k --resolve api.example.test:8443:127.0.0.1 https://api.example.test:8443/
 curl -s http://127.0.0.1:8080/api/report
 ```
 
-В отчёте должны появиться `sni=api.example.test`, `tls=TLS 1.3`, `alpn=h2` или `http/1.1`, а также `offered_alpn` и `hello`. Если SNI отсутствует, это фиксируется как пустое значение — нельзя подставлять Host header и выдавать его за TLS SNI.
+В отчёте должны появиться `sni=api.example.test`, `tls=TLS 1.3`, `alpn=h2`
+или `http/1.1`, а также `offered_alpn` и `hello`.
 
-SNI — это имя, предложенное клиентом для выбора сертификата. Оно не доказывает, что клиент действительно принадлежит этому домену. `Forwarded`/`X-Forwarded-For` также нельзя принимать безусловно: доверять им следует только от заранее известных proxy hop.
+Если SNI отсутствует, это фиксируется как пустое значение. Нельзя подставлять
+HTTP `Host` и выдавать его за TLS SNI.
 
-Готовый пример preread-режима находится в [`configs/nginx/httpfin-stream.conf`](../configs/nginx/httpfin-stream.conf). Он логирует SNI, ALPN и stream-level bytes/session time, но намеренно не обещает HTTP-level fingerprint.
+SNI — это имя, предложенное клиентом для выбора сертификата. Оно не доказывает,
+что клиент действительно принадлежит этому домену.
+
+`Forwarded` и `X-Forwarded-For` также нельзя принимать безусловно. Доверяйте
+им только от заранее известных proxy hop.
+
+Готовый пример preread-режима находится в
+[`configs/nginx/httpfin-stream.conf`](../configs/nginx/httpfin-stream.conf).
+Он логирует SNI, ALPN и stream-level bytes/session time, но намеренно не
+обещает HTTP-level fingerprint.
 
 ## 6. Анализ отправок и проблем с прокси
 
 `httpfin` можно временно назначить адресатом исходящего запроса. В этом
-сценарии он работает как тестовый приёмник: принимает запрос и показывает в
-отчёте, что реально отправил клиент — User-Agent, HTTP-версию, TLS/SNI/ALPN,
-статус и задержку. Это не proxy и не генератор исходящего трафика.
+сценарии он работает как тестовый приёмник и показывает в отчёте, что реально
+отправил клиент: User-Agent, HTTP-версию, TLS/SNI/ALPN, статус и задержку.
+
+Это не proxy и не генератор исходящего трафика.
 
 ```bash
 httpfin_addr=:8080 go run ./cmd/httpfin
@@ -158,14 +194,24 @@ curl -sS http://127.0.0.1:8080/api/report > incident-2026-11-25.txt
 
 В реализации разделяем стандартизированные наблюдения и эвристические fingerprints:
 
-- TLS ClientHello и negotiated version — модель TLS 1.3; в текущем RFC Editor актуальная редакция TLS 1.3 — [RFC 9846](https://www.rfc-editor.org/rfc/rfc9846), которая обновляет RFC 8446.
-- ALPN — [RFC 7301](https://www.rfc-editor.org/rfc/rfc7301). Значение `h2` означает выбор HTTP/2, но само по себе не доказывает браузер.
-- HTTP/2 connection и binary framing — [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113). SETTINGS, порядок кадров и приоритеты могут быть полезными признаками, но это уже наблюдаемая реализация клиента, а не отдельный RFC fingerprint.
-- HTTP semantics — [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110): метод, target, status и поля запроса должны храниться отдельно от TLS-признаков.
-- Цепочка прокси — [RFC 7239](https://www.rfc-editor.org/rfc/rfc7239) (`Forwarded`). Доверять `Forwarded` или `X-Forwarded-For` можно только от явно доверенного proxy hop; иначе клиент может подделать исходный IP.
+- TLS ClientHello и negotiated version — модель TLS 1.3. В текущем RFC Editor
+  актуальная редакция TLS 1.3 — [RFC 9846](https://www.rfc-editor.org/rfc/rfc9846),
+  которая обновляет RFC 8446.
+- ALPN — [RFC 7301](https://www.rfc-editor.org/rfc/rfc7301). Значение `h2`
+  означает выбор HTTP/2, но само по себе не доказывает, что клиент — браузер.
+- HTTP/2 connection и binary framing — [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113).
+  SETTINGS, порядок кадров и приоритеты могут быть полезными признаками. Это
+  наблюдаемая реализация клиента, а не отдельный RFC fingerprint.
+- HTTP semantics — [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110): метод,
+  target, status и поля запроса должны храниться отдельно от TLS-признаков.
+- Цепочка прокси — [RFC 7239](https://www.rfc-editor.org/rfc/rfc7239)
+  (`Forwarded`). Доверять `Forwarded` или `X-Forwarded-For` можно только от
+  явно доверенного proxy hop; иначе клиент может подделать исходный IP.
 - SNI — [RFC 6066](https://www.rfc-editor.org/rfc/rfc6066), а ограничения видимости имени при ECH — [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849).
 
-JA3/JA4 не являются заменой RFC-модели и не должны называться «идентификатором клиента». В коде это отражается отдельными полями `JA3`, `JA4`, `Reference*` и `BaselineStatus`.
+JA3/JA4 не заменяют RFC-модель и не должны называться «идентификатором
+клиента». В коде это отражается отдельными полями `JA3`, `JA4`, `Reference*` и
+`BaselineStatus`.
 
 ## Источники и техническая база
 

@@ -77,6 +77,23 @@ func TestWriteBoundsLongDiagnosticFields(t *testing.T) {
 	}
 }
 
+func TestWriteHTMLUsesSnapshotForStaticAndLiveViews(t *testing.T) {
+	snapshot := BuildSnapshot([]model.Connection{{ID: "one", ClientIP: "203.0.113.4", Status: 200}}, time.Unix(10, 0))
+	static := httptest.NewRecorder()
+	WriteHTML(static, snapshot, false)
+	if static.Code != 200 || !strings.Contains(static.Body.String(), "httpfin — observations") || strings.Contains(static.Body.String(), "EventSource") || strings.Contains(static.Body.String(), "data:font/woff2;base64,") {
+		t.Fatalf("unexpected static HTML response")
+	}
+	if got := static.Header().Get("Content-Disposition"); got != `attachment; filename="httpfin-report.html"` {
+		t.Fatalf("unexpected HTML disposition: %q", got)
+	}
+	live := httptest.NewRecorder()
+	WriteHTML(live, snapshot, true)
+	if !strings.Contains(live.Body.String(), "new EventSource('/events')") || !strings.Contains(live.Body.String(), "api/snapshot") || !strings.Contains(live.Body.String(), "jQuery v3.7.1") || !strings.Contains(live.Body.String(), "$.getJSON") {
+		t.Fatalf("live HTML is missing canonical refresh wiring")
+	}
+}
+
 func BenchmarkWriteReport5000(b *testing.B) {
 	rows := make([]model.Connection, 5000)
 	for i := range rows {

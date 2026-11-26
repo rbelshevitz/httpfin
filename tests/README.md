@@ -35,6 +35,19 @@ replacement for `nginx -t`.
 ./tests/container-smoke.sh
 ```
 
+## Dashboard bot-farm smoke test
+
+Generate synthetic browser and API-client traffic, validate the canonical
+snapshot, and capture the dashboard:
+
+```bash
+./tests/dashboard-smoke.sh
+```
+
+The screenshot is written to `/tmp/httpfin-dashboard-smoke.png` by default.
+This test uses a standalone local collector and never sends traffic to a real
+endpoint.
+
 The script builds the existing pinned image, starts the existing Compose stack,
 uses `curl --resolve` so the TLS ClientHello contains
 `inspector.example.test`, requests HTTP/2 when the host curl supports it, and

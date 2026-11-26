@@ -1,58 +1,62 @@
-# httpfin roadmap
+# httpfin roadmap after 0.2
+
+Version 0.2 covers the main working path: observation collection, JSON API,
+text report, HTML status page, TLS/HTTP modes, and documentation. The remaining
+work is limited to three focused accuracy and reliability improvements.
 
 ## Product boundary
 
-`httpfin` is a diagnostic observer in front of an API. In the supported
-production topology, Nginx terminates TLS and the module sends a bounded HTTP
-event to Go. Go stores recent observations and produces a readable report.
+`httpfin` is an observation tool in front of an API. It reports only fields
+actually collected at the selected observation point. It does not authenticate
+clients, identify people, block traffic, or act as a MITM proxy.
 
-The product does not authenticate clients, block traffic, or act as a MITM
-proxy. It does not provide standard JA3/JA4 in the Nginx HTTP-module path.
+Supported observation points:
 
-## Done
+- `go-http`: HTTP middleware; no ClientHello;
+- `go-tls`: direct Go TLS listener with TLS version, SNI, ALPN, and custom
+  `ClientHelloSig`;
+- `nginx-http-module`: limited post-termination HTTP event over Unix datagram.
 
-- [x] Nginx termination and passthrough examples, dynamic-module compatibility,
-  Docker build guidance, and host/systemd deployment files.
-- [x] Bounded in-memory storage, browser profiles, baseline comparison, and
-  secret redaction.
-- [x] JSON API, UI, and readable report with clients, evidence, and fingerprint
-  changes.
-- [x] Docker smoke mode and host/systemd production mode.
-- [x] Integration, fuzz, restart, and race-detector coverage.
-- [x] Operations, QA, and non-technical documentation.
+Standard JA3/JA4 and HTTP/2 fingerprints are not computed by the built-in
+collection paths. Empty means not observed at that point.
 
-## Next release
+## Done in 0.2
 
-- [ ] Add event-loss accounting: `received -> decoded -> stored -> dropped`.
-  Show the result in diagnostic output and document reconciliation with the
-  Nginx access log.
-- [ ] Add repeatable reliability checks for socket permissions, datagram
-  overflow, a stopped collector, and a slow collector. Nginx must continue
-  serving requests in every case.
-- [ ] Run and document a host deployment check: certificate paths, permissions,
-  restart, health check, report download, and graceful shutdown.
+- [x] Bounded in-memory storage of recent observations.
+- [x] JSON API, text report, and strict HTML status page from the same
+  `model.Connection` records.
+- [x] Live mode using local jQuery only for state refresh.
+- [x] Access-oriented table with time, IP, method, path, HTTP status, latency,
+  profile, TLS/ALPN, SNI, UA, and detection point.
+- [x] Per-record details for Client, TLS, available fingerprints, and baseline.
+- [x] Baseline comparison only when `ClientHelloSig` is available.
+- [x] Non-scoring `Risk` hidden from the status page and retained only in the
+  raw model for external-source compatibility.
+- [x] Missing fields are not replaced with synthetic evidence.
+- [x] Host timezone display through `time.Local`; stored timestamps remain UTC.
+- [x] Demo/smoke records explicitly marked with `observation_point=demo`.
 
-## Separate future experiment
+## Next focused improvements
 
-- [ ] Test standard JA3/JA4 in a separate direct-Go TLS listener using the
-  MIT-licensed [`psanford/tlsfingerprint`](https://github.com/psanford/tlsfingerprint).
-  The listener would terminate TLS, read ClientHello before the handshake, and
-  pass the result into the report. This is a new input mode, not a change to
-  the current Nginx HTTP module.
-- [ ] Only if the direct listener is insufficient, evaluate a dedicated
-  reverse proxy or a separate passive TLS program. A MITM proxy is not required
-  by the supported product topology.
+- [ ] Fix the Nginx event contract to carry request time, `elapsed_ms`, and
+  `bytes`, instead of only collector receive time.
+- [ ] Add `received -> decoded -> stored -> dropped` accounting.
+- [ ] Add report-contract tests for all observation points and absent fields.
 
-## Later, only if required
+## Deferred
 
-- [ ] Optional SQLite history across restarts, with retention, redaction,
-  cleanup, disk-full handling, and recovery rules. Do not enable by default.
-- [ ] Automatic profile updates and distributed storage.
+Unix-datagram stress testing, a dedicated wire observer for standard JA3/JA4,
+`HTTP2Fingerprints` baseline matching, SQLite history, profile updates, and
+distributed storage are deliberately outside the current release. Reopen them
+only when there is a concrete operational requirement.
 
-## Current constraints
+## Constraints
 
-- The Nginx HTTP module runs after TLS termination and cannot parse the original
-  ClientHello or see passthrough HTTP traffic.
-- The Unix datagram is a fast, best-effort handoff. An event can be lost while
-  the client request still succeeds; access logs remain the request record.
-- Dynamic modules must match the Nginx version and libc used at runtime.
+- The Nginx HTTP module runs after TLS termination and cannot see the original
+  ClientHello or HTTP inside TLS passthrough.
+- Unix datagrams are best-effort; an event may be lost while the client request
+  still succeeds.
+- User-Agent, profiles, and fingerprints are spoofable signals, not identity.
+- `Risk` is a source label, not a calculated threat score.
+- `Baseline` is a limited `ClientHelloSig` comparison, not a client verdict.
+- Dynamic Nginx modules must match the runtime Nginx version and libc.

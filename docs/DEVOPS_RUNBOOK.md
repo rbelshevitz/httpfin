@@ -14,6 +14,11 @@
 
 ## Run the Docker image
 
+With a direct collector run, the status dashboard and HTTP API are available on
+port `8080`: <http://127.0.0.1:8080/>. In the Docker smoke setup, external
+HTTPS access goes through Nginx on port `8443`; Nginx proxies requests to the
+collector.
+
 ```bash
 docker build -t httpfin:dev .
 docker run --rm -p 8443:8443 httpfin:dev

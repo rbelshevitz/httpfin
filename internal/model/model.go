@@ -37,17 +37,19 @@ type Connection struct {
 }
 
 type Store struct {
-	mu       sync.RWMutex
-	items    []Connection
-	next     int
-	count    int
-	capacity int
+	mu          sync.RWMutex
+	items       []Connection
+	next        int
+	count       int
+	capacity    int
+	subscribers map[int]chan Connection
+	nextSub     int
 }
 
 const defaultCapacity = 5000
 
 func NewStore(items []Connection) *Store {
-	s := &Store{capacity: defaultCapacity, items: make([]Connection, defaultCapacity)}
+	s := &Store{capacity: defaultCapacity, items: make([]Connection, defaultCapacity), subscribers: make(map[int]chan Connection)}
 	for i := len(items) - 1; i >= 0; i-- {
 		s.addLocked(items[i])
 	}
@@ -58,6 +60,37 @@ func (s *Store) Add(c Connection) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.addLocked(c)
+	for _, ch := range s.subscribers {
+		select {
+		case ch <- c:
+		default:
+			// A slow dashboard must never delay ingestion. Its next event will
+			// cause a full snapshot refresh in the browser.
+		}
+	}
+}
+
+// Subscribe returns a bounded stream of newly stored observations and a
+// cancellation function. Subscribers are deliberately best-effort: the store
+// remains the source of truth and clients can refresh a complete snapshot.
+func (s *Store) Subscribe() (<-chan Connection, func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.subscribers == nil {
+		s.subscribers = make(map[int]chan Connection)
+	}
+	id := s.nextSub
+	s.nextSub++
+	ch := make(chan Connection, 32)
+	s.subscribers[id] = ch
+	return ch, func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if current, ok := s.subscribers[id]; ok {
+			delete(s.subscribers, id)
+			close(current)
+		}
+	}
 }
 
 func (s *Store) addLocked(c Connection) {

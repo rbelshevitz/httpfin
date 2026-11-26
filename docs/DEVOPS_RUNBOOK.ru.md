@@ -4,7 +4,7 @@
 
 httpfin нужен, когда обычного access log недостаточно, чтобы быстро ответить:
 
-- дошёл ли запрос до Nginx и до Go collector;
+- дошёл ли запрос до Nginx и до Go-сборщика;
 - какой IP реально видит edge;
 - какой SNI и ALPN пришли от клиента;
 - был ли выбран HTTP/2 или HTTP/1.1;
@@ -13,6 +13,11 @@ httpfin нужен, когда обычного access log недостаточ�
 - можно ли приложить доказательный отчёт к incident ticket.
 
 ## Локальный запуск через Docker
+
+При прямом запуске status-dashboard и HTTP API доступны на порту `8080`:
+<http://127.0.0.1:8080/>. В Docker smoke-сценарии внешний HTTPS-доступ идёт
+через Nginx на порту `8443`; внутренний Go-сборщик при этом использует свой
+служебный HTTP-порт.
 
 ```bash
 docker build -t httpfin:dev .
@@ -95,7 +100,7 @@ openssl s_client \
 Значения:
 
 - `sent` — событие принято Unix socket;
-- `unavailable` — Go collector не поднял socket до старта Nginx;
+- `unavailable` — Go-сборщик не поднял socket до старта Nginx;
 - `dropped_backpressure` — socket переполнен;
 - `dropped_error` — ошибка отправки;
 - `oversize` — событие превысило лимит 4096 bytes.
@@ -139,7 +144,9 @@ CIDR должен содержать только доверенные proxy hop
 
 ### «Модуль тормозит Nginx»
 
-Проверить, что используется именно `SOCK_DGRAM` + `O_NONBLOCK`. Модуль не должен вызывать HTTP, DNS, Go/cgo, SQLite или ждать ответа collector в request phase.
+Проверьте, что используются именно `SOCK_DGRAM` и `O_NONBLOCK`. Модуль не
+должен вызывать HTTP, DNS, Go/cgo или SQLite, а также ждать ответа сборщика в
+фазе обработки запроса.
 
 ## Рекомендация по эксплуатации
 
@@ -153,6 +160,6 @@ CIDR должен содержать только доверенные proxy hop
 
 Аварийный bypass: выставить `httpfin off;` в затронутом `server` или
 `location`, выполнить `nginx -t` и reload Nginx. Это убирает handoff модуля из
-request path, сохраняя proxy и access log. Go collector можно оставить
+пути обработки запроса, сохраняя proxy и access log. Go-сборщик можно оставить
 запущенным до выяснения причины. Возвращать `httpfin on;` следует сначала на
 canary и повторить сравнение событий с access log.
