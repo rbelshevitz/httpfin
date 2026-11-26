@@ -128,6 +128,39 @@ func TestValidEventRejectsOversizedFields(t *testing.T) {
 	}
 }
 
+func TestNginxEventNormalizesAccessFields(t *testing.T) {
+	event := nginxEvent{
+		Version:     1,
+		RequestID:   "access-fields",
+		Method:      "GET",
+		URI:         "/api/items",
+		Host:        "api.example.test",
+		RemoteAddr:  "203.0.113.7",
+		Status:      200,
+		RequestTime: "0.123",
+		BytesSent:   "4096",
+		Protocol:    "HTTP/2.0",
+	}
+	if got := requestTimeMillis(event.RequestTime); got != 123 {
+		t.Fatalf("request time = %d, want 123 ms", got)
+	}
+	if got := parseBytes(event.BytesSent); got != 4096 {
+		t.Fatalf("bytes = %d, want 4096", got)
+	}
+	if got := valueOr(event.Protocol, "HTTP"); got != "HTTP/2.0" {
+		t.Fatalf("protocol = %q, want HTTP/2.0", got)
+	}
+}
+
+func TestNginxEventNormalizesInvalidAccessFieldsToZero(t *testing.T) {
+	if got := requestTimeMillis("bad"); got != 0 {
+		t.Fatalf("invalid request time = %d, want 0", got)
+	}
+	if got := parseBytes("-1"); got != 0 {
+		t.Fatalf("invalid bytes = %d, want 0", got)
+	}
+}
+
 func TestStartUnixDatagramSkipsInvalidAndContinues(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "events.sock")
 	store := model.NewStore(nil)
@@ -176,6 +209,47 @@ func TestStartUnixDatagramSkipsInvalidAndContinues(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatalf("invalid datagrams were not ignored or valid event was not ingested: %#v", store.List())
+}
+
+func TestStartUnixDatagramCountersDescribePipeline(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "events.sock")
+	store := model.NewStore(nil)
+	counters := NewCounters()
+	stop, _, err := StartUnixDatagramWithCounters(path, store, nil, counters)
+	if err != nil {
+		if strings.Contains(err.Error(), "operation not permitted") {
+			t.Skip("sandbox disallows Unix datagram sockets")
+		}
+		t.Fatal(err)
+	}
+	defer stop()
+	addr, err := net.ResolveUnixAddr("unixgram", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := net.DialUnix("unixgram", nil, addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	for _, payload := range [][]byte{
+		[]byte("not-json"),
+		[]byte(`{"version":2,"request_id":"wrong"}`),
+		[]byte(`{"version":1,"request_id":"accepted","method":"GET","uri":"/"}`),
+	} {
+		if _, err := conn.Write(payload); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		got := counters.Snapshot()
+		if got.Received == 3 && got.Decoded == 2 && got.Stored == 1 && got.Dropped == 2 {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("unexpected ingest counters: %+v", counters.Snapshot())
 }
 
 func TestStartUnixDatagramCanRestartOnSamePath(t *testing.T) {

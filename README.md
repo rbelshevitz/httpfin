@@ -77,6 +77,7 @@ Verify that the request reached the collector and save reports:
 
 ```bash
 curl -fsS http://127.0.0.1:8080/healthz
+curl -fsS http://127.0.0.1:8080/api/ingest
 curl -fsS http://127.0.0.1:8080/api/connections
 curl -fsS http://127.0.0.1:8080/api/report > httpfin-report.txt
 curl -fsS http://127.0.0.1:8080/report > httpfin-report.html
@@ -87,6 +88,11 @@ standalone HTML snapshot is available at <http://127.0.0.1:8080/report>, the
 aggregated snapshot at `/api/snapshot`, and live events at `/events` (SSE).
 The dashboard shows recent observations, the detection point, transport
 evidence, and details for the selected record.
+
+`/api/ingest` exposes the Nginx-to-Go pipeline counters. `received` is the
+number of datagrams read, `decoded` is valid JSON, `stored` reached the
+collector store, and `dropped` was rejected as malformed or invalid. These
+counters describe telemetry delivery, not client risk or request quality.
 
 By default the collector listens only on `127.0.0.1:8080` and keeps a bounded
 number of recent observations in memory.
@@ -127,10 +133,9 @@ write a report file; save the response by redirecting command output.
 - changes between sequential observations;
 - a JSON API, UI, and text report.
 
-In direct Go mode, timing and response size are stored in the observation. Nginx
-can provide these values in its access log, but the current HTTP module does
-not include them in the httpfin event, so they do not enter its report
-automatically.
+In direct Go mode, timing and response size are stored in the observation. The
+Nginx module also sends request time, response size, and server protocol when
+those variables are available.
 
 ## Important limits
 
@@ -141,19 +146,18 @@ The available fields depend on the observation point. An empty field means
 
 After TLS termination, the module sees Nginx request-level data: method, URI,
 User-Agent, source address, final HTTP status, negotiated TLS version, SNI,
-and ALPN. It sends the event to Go after request processing through a
-non-blocking Unix datagram.
+and ALPN. It also sends request time, response size, and server protocol. The
+event goes to Go after request processing through a non-blocking Unix datagram.
 
 At that stage the original `ClientHello` is no longer available. Therefore the
 current module:
 
 - does not calculate standard JA3 or JA4;
 - does not collect an HTTP/2 fingerprint or connection settings;
-- does not include `elapsed_ms`, response size, or response headers in its event.
+- does not include response headers in its event.
 
-Timing and response size can be obtained separately from the Nginx access log.
-They will not appear in an httpfin record until they are added to the event
-contract.
+Timing and response size are normalized into `elapsed_ms` and `bytes` when the
+Nginx variables are available; missing values remain zero.
 
 ### Direct Go TLS
 

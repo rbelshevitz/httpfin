@@ -383,7 +383,8 @@ ngx_http_httpfin_emit(ngx_http_request_t *r, ngx_http_httpfin_ctx_t *ctx,
 {
     u_char event[httpfin_max_event], *p, *last;
     u_char status[NGX_INT_T_LEN], *status_end;
-    ngx_str_t method, uri, host, ua, remote, tls_version, sni, alpn;
+    ngx_str_t method, uri, host, ua, remote, request_time, bytes_sent,
+              protocol, tls_version, sni, alpn;
     ssize_t n;
 
     if (ngx_http_httpfin_socket == -1 &&
@@ -403,6 +404,15 @@ ngx_http_httpfin_emit(ngx_http_request_t *r, ngx_http_httpfin_ctx_t *ctx,
         ua = r->headers_in.user_agent->value;
     }
     remote = r->connection->addr_text;
+    ngx_http_httpfin_get_variable(r, &request_time,
+                                  (u_char *) "request_time",
+                                  sizeof("request_time") - 1);
+    ngx_http_httpfin_get_variable(r, &bytes_sent,
+                                  (u_char *) "bytes_sent",
+                                  sizeof("bytes_sent") - 1);
+    ngx_http_httpfin_get_variable(r, &protocol,
+                                  (u_char *) "server_protocol",
+                                  sizeof("server_protocol") - 1);
     ngx_http_httpfin_get_variable(r, &tls_version,
                                   (u_char *) "ssl_protocol",
                                   sizeof("ssl_protocol") - 1);
@@ -454,7 +464,19 @@ ngx_http_httpfin_emit(ngx_http_request_t *r, ngx_http_httpfin_ctx_t *ctx,
                                 (size_t) (status_end - status)) != NGX_OK) {
         goto oversize;
     }
-    HTTPFIN_APPEND_LITERAL(",\"tls_version\":\"");
+    HTTPFIN_APPEND_LITERAL(",\"request_time\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &request_time) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"bytes_sent\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &bytes_sent) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"protocol\":\"");
+    if (ngx_http_httpfin_json_string(&p, last, &protocol) != NGX_OK) {
+        goto oversize;
+    }
+    HTTPFIN_APPEND_LITERAL("\",\"tls_version\":\"");
     if (ngx_http_httpfin_json_string(&p, last, &tls_version) != NGX_OK) {
         goto oversize;
     }

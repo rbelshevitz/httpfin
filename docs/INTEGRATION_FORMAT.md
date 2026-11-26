@@ -72,8 +72,15 @@ Docker, one entrypoint starts both processes.
 ## Event fields
 
 The module sends version `1` JSON containing request ID, method, URI, host,
-User-Agent, source address, status, TLS version, SNI and negotiated ALPN. Empty
-TLS fields are expected for plain HTTP, passthrough, or unavailable variables.
+User-Agent, source address, status, Nginx request time, bytes sent, HTTP
+protocol, TLS version, SNI, and negotiated ALPN. The request time, byte count,
+and protocol are copied from `$request_time`, `$bytes_sent`, and
+`$server_protocol`; they are optional for backward compatibility. Empty TLS or
+access fields mean that the corresponding Nginx variable was unavailable.
+
+Go normalizes `request_time` into `elapsed_ms` and `bytes_sent` into `bytes` in
+the stored `Connection` record. Empty TLS fields are expected for plain HTTP,
+passthrough, or unavailable variables.
 
 The event feeds `/api/connections`. Exact JA3/JA4 and HTTP/2 fingerprints need
 raw ClientHello and connection-frame observation; one post-termination request

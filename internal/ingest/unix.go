@@ -19,30 +19,39 @@ const (
 )
 
 type nginxEvent struct {
-	Version    int    `json:"version"`
-	RequestID  string `json:"request_id"`
-	Method     string `json:"method"`
-	URI        string `json:"uri"`
-	Host       string `json:"host"`
-	UserAgent  string `json:"user_agent"`
-	RemoteAddr string `json:"remote_addr"`
-	Status     int    `json:"status"`
-	TLSVersion string `json:"tls_version"`
-	SNI        string `json:"sni"`
-	ALPN       string `json:"alpn"`
+	Version     int    `json:"version"`
+	RequestID   string `json:"request_id"`
+	Method      string `json:"method"`
+	URI         string `json:"uri"`
+	Host        string `json:"host"`
+	UserAgent   string `json:"user_agent"`
+	RemoteAddr  string `json:"remote_addr"`
+	Status      int    `json:"status"`
+	RequestTime string `json:"request_time"`
+	BytesSent   string `json:"bytes_sent"`
+	Protocol    string `json:"protocol"`
+	TLSVersion  string `json:"tls_version"`
+	SNI         string `json:"sni"`
+	ALPN        string `json:"alpn"`
 }
 
 // StartUnixDatagram consumes compact JSON events from an Nginx module.
 // Datagram writes are intentionally one-way: an unavailable collector must
 // not stall an Nginx request worker.
 func StartUnixDatagram(path string, store *model.Store) (func(), func() bool, error) {
-	return StartUnixDatagramWithHandler(path, store, nil)
+	return StartUnixDatagramWithCounters(path, store, nil, nil)
 }
 
 // StartUnixDatagramWithHandler passes normalized Nginx events through the
 // collector pipeline before they are stored. A nil handler keeps store-only
 // behavior for small integrations and tests.
 func StartUnixDatagramWithHandler(path string, store *model.Store, handler func(model.Connection)) (func(), func() bool, error) {
+	return StartUnixDatagramWithCounters(path, store, handler, nil)
+}
+
+// StartUnixDatagramWithCounters is the instrumented variant used by the
+// collector. Counters are optional so small integrations can keep the old API.
+func StartUnixDatagramWithCounters(path string, store *model.Store, handler func(model.Connection), counters *Counters) (func(), func() bool, error) {
 	if path == "" {
 		return func() {}, func() bool { return true }, nil
 	}
@@ -97,14 +106,26 @@ func StartUnixDatagramWithHandler(path string, store *model.Store, handler func(
 				log.Printf("httpfin ingest stopped: %v", readErr)
 				return
 			}
+			if counters != nil {
+				counters.received.Add(1)
+			}
 			var wire nginxEvent
 			if err := json.Unmarshal(buf[:n], &wire); err != nil {
+				if counters != nil {
+					counters.dropped.Add(1)
+				}
 				continue
+			}
+			if counters != nil {
+				counters.decoded.Add(1)
 			}
 			if !validEvent(wire) {
+				if counters != nil {
+					counters.dropped.Add(1)
+				}
 				continue
 			}
-			event := model.Connection{ID: wire.RequestID, Timestamp: time.Now().UTC(), ClientIP: wire.RemoteAddr, Method: wire.Method, URL: wire.URI, Status: wire.Status, UserAgent: wire.UserAgent, TLSVersion: wire.TLSVersion, SNI: wire.SNI, ALPN: wire.ALPN, ObservationPoint: "nginx-http-module", DetectedProfile: "Unknown", UAConsistency: "Unknown", Risk: "Info", Protocol: "HTTP"}
+			event := model.Connection{ID: wire.RequestID, Timestamp: time.Now().UTC(), ClientIP: wire.RemoteAddr, Method: wire.Method, URL: wire.URI, Host: wire.Host, Status: wire.Status, ElapsedMS: requestTimeMillis(wire.RequestTime), Bytes: parseBytes(wire.BytesSent), UserAgent: wire.UserAgent, TLSVersion: wire.TLSVersion, SNI: wire.SNI, ALPN: wire.ALPN, ObservationPoint: "nginx-http-module", DetectedProfile: "Unknown", UAConsistency: "Unknown", Risk: "Info", Protocol: valueOr(wire.Protocol, "HTTP")}
 			if event.ID == "" {
 				event.ID = fmt.Sprintf("nginx-%d", n)
 			}
@@ -112,6 +133,9 @@ func StartUnixDatagramWithHandler(path string, store *model.Store, handler func(
 				handler(event)
 			} else {
 				store.Add(event)
+			}
+			if counters != nil {
+				counters.stored.Add(1)
 			}
 		}
 	}()
@@ -138,7 +162,32 @@ func validEvent(w nginxEvent) bool {
 		len(w.Method) <= maxField && len(w.URI) <= maxField &&
 		len(w.Host) <= maxField && len(w.UserAgent) <= maxField &&
 		len(w.RemoteAddr) <= maxField && len(w.TLSVersion) <= maxField &&
-		len(w.SNI) <= maxField && len(w.ALPN) <= maxField
+		len(w.RequestTime) <= maxField && len(w.BytesSent) <= maxField &&
+		len(w.Protocol) <= maxField && len(w.SNI) <= maxField &&
+		len(w.ALPN) <= maxField
+}
+
+func requestTimeMillis(value string) int64 {
+	seconds, err := strconv.ParseFloat(value, 64)
+	if err != nil || seconds < 0 {
+		return 0
+	}
+	return int64(seconds * 1000)
+}
+
+func parseBytes(value string) int64 {
+	bytes, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || bytes < 0 {
+		return 0
+	}
+	return bytes
+}
+
+func valueOr(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 // deadline is kept short so shutdown is responsive without introducing a

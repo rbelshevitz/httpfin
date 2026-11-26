@@ -126,8 +126,13 @@ access log, а не по одному полю этой строки. Отдел
 Модуль отправляет компактное событие:
 
 ```json
-{"version":1,"request_id":"15-0","method":"GET","uri":"/healthz","host":"inspector.example.test","user_agent":"curl/8.10.1","remote_addr":"172.17.0.1","status":204,"tls_version":"TLS 1.3","sni":"inspector.example.test","alpn":"h2"}
+{"version":1,"request_id":"15-0","method":"GET","uri":"/healthz","host":"inspector.example.test","user_agent":"curl/8.10.1","remote_addr":"172.17.0.1","status":204,"request_time":"0.001","bytes_sent":"0","protocol":"HTTP/2.0","tls_version":"TLS 1.3","sni":"inspector.example.test","alpn":"h2"}
 ```
+
+`request_time`, `bytes_sent` и `protocol` берутся из переменных Nginx
+`$request_time`, `$bytes_sent` и `$server_protocol`. Эти поля необязательны для
+совместимости со старыми отправителями. Go преобразует их в `elapsed_ms`,
+`bytes` и `protocol` в записи `Connection`.
 
 Это источник данных для `/api/connections`. Поля TLS могут быть пустыми, если
 Nginx не завершал TLS, модуль включён в plain HTTP server или соответствующая

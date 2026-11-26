@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"httpfin/internal/ingest"
 	"httpfin/internal/model"
 	"httpfin/internal/report"
 	"net/http"
@@ -100,6 +101,29 @@ func healthHandler(ingestHealthy func() bool) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func ingestStatsHandler(ingestHealthy func() bool, counters *ingest.Counters) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		status := "ok"
+		code := http.StatusOK
+		healthy := ingestHealthy == nil || ingestHealthy()
+		if !healthy {
+			status = "unavailable"
+			code = http.StatusServiceUnavailable
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		_ = json.NewEncoder(w).Encode(struct {
+			Status  string                 `json:"status"`
+			Healthy bool                   `json:"healthy"`
+			Events  ingest.CounterSnapshot `json:"events"`
+		}{status, healthy, counters.Snapshot()})
 	}
 }
 func writeJSON(w http.ResponseWriter, value any) {

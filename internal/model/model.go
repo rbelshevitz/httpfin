@@ -13,6 +13,7 @@ type Connection struct {
 	ClientIP          string    `json:"client_ip"`
 	Method            string    `json:"method"`
 	URL               string    `json:"url"`
+	Host              string    `json:"host,omitempty"`
 	Status            int       `json:"status"`
 	Bytes             int64     `json:"bytes"`
 	UserAgent         string    `json:"user_agent"`

@@ -45,8 +45,9 @@ compare a direct request with one through the entry point:
 - response status;
 - the event in the report and access log.
 
-Take request time and response size from the Nginx access log: the current
-module does not pass those fields in every mode.
+The Nginx event includes request time and response size when the corresponding
+Nginx variables are available; compare them with the access log when diagnosing
+an upstream or logging discrepancy.
 
 This helps find lost client addresses, wrong virtual hosts, HTTP/2 to HTTP/1.1
 changes, and latency introduced between the edge and the application.

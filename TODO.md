@@ -38,9 +38,10 @@ collection paths. Empty means not observed at that point.
 
 ## Next focused improvements
 
-- [ ] Fix the Nginx event contract to carry request time, `elapsed_ms`, and
-  `bytes`, instead of only collector receive time.
-- [ ] Add `received -> decoded -> stored -> dropped` accounting.
+- [x] Extend the Nginx event contract with host, request time, protocol, and
+  response size; Go normalizes them into `elapsed_ms`, `bytes`, and `protocol`.
+- [x] Add `received -> decoded -> stored -> dropped` accounting and expose it
+  through `/api/ingest`.
 - [ ] Add report-contract tests for all observation points and absent fields.
 
 ## Deferred

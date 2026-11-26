@@ -65,12 +65,35 @@ until curl -kfsS --resolve inspector.example.test:8443:127.0.0.1 \
 	sleep 1
 done
 
-body=$(curl -kfsS --resolve inspector.example.test:8443:127.0.0.1 \
-	${curl_http2_args} https://inspector.example.test:8443/api/connections)
+body=""
+j=0
+until printf '%s\n' "$body" | grep -Fq '"url":"/healthz"'; do
+	body=$(curl -kfsS --resolve inspector.example.test:8443:127.0.0.1 \
+		${curl_http2_args} https://inspector.example.test:8443/api/connections)
+	j=$((j + 1))
+	if [ "$j" -ge 50 ]; then
+		echo "collector did not receive the healthz event" >&2
+		$compose logs --no-color httpfin >&2 || true
+		exit 1
+	fi
+	sleep 0.1
+done
 printf '%s\n' "$body" | grep -Fq '"url":"/healthz"'
 printf '%s\n' "$body" | grep -Fq '"tls_version":"TLSv1.3"'
 printf '%s\n' "$body" | grep -Fq '"sni":"inspector.example.test"'
 printf '%s\n' "$body" | grep -Fq '"alpn":"h2"'
+printf '%s\n' "$body" | grep -Fq '"host":"inspector.example.test:8443"'
+printf '%s\n' "$body" | grep -Fq '"protocol":"HTTP/2.0"'
+printf '%s\n' "$body" | grep -Fq '"elapsed_ms":'
+printf '%s\n' "$body" | grep -Fq '"bytes":'
+
+ingest=$(curl -kfsS --resolve inspector.example.test:8443:127.0.0.1 \
+	${curl_http2_args} https://inspector.example.test:8443/api/ingest)
+printf '%s\n' "$ingest" | grep -Fq '"status":"ok"'
+printf '%s\n' "$ingest" | grep -Fq '"received":'
+printf '%s\n' "$ingest" | grep -Fq '"decoded":'
+printf '%s\n' "$ingest" | grep -Fq '"stored":'
+printf '%s\n' "$ingest" | grep -Fq '"dropped":'
 
 mock=$(curl -kfsS --resolve inspector.example.test:8443:127.0.0.1 \
 	${curl_http2_args} https://inspector.example.test:8443/app/api/catalog)

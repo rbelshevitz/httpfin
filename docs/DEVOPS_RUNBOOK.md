@@ -48,9 +48,11 @@ real observation; do not replace it with the HTTP `Host` value.
 
 The Nginx access log contains a diagnostic `handoff` variable. It may still
 show `not_sent` because Nginx log variables can be evaluated before the module
-log handler runs. Verify delivery through `/api/connections` and collector
-errors in the log rather than that access-log field alone. Runtime loss counters
-are not enabled yet.
+log handler runs. Verify delivery through `/api/connections`, `/api/ingest`,
+and collector errors in the log rather than that access-log field alone.
+`/api/ingest` reports the collector-side lifecycle: `received`, `decoded`,
+`stored`, and `dropped`. These counters do not prove that Nginx emitted every
+request; they begin when a datagram reaches the collector socket.
 
 Possible module states include `sent`, `unavailable`,
 `dropped_backpressure`, `dropped_error`, and `oversize`. Backpressure is a

@@ -143,8 +143,12 @@ not reconstructed from the ordinary HTTP request phase in this module.
 Each datagram is newline-terminated JSON, capped at 4096 bytes:
 
 ```json
-{"version":1,"request_id":"1234-7","method":"GET","uri":"/healthz","host":"example.test","user_agent":"curl/8","remote_addr":"127.0.0.1","status":200,"tls_version":"TLS 1.3","sni":"example.test","alpn":"h2"}
+{"version":1,"request_id":"1234-7","method":"GET","uri":"/healthz","host":"example.test","user_agent":"curl/8","remote_addr":"127.0.0.1","status":200,"request_time":"0.003","bytes_sent":"124","protocol":"HTTP/2.0","tls_version":"TLS 1.3","sni":"example.test","alpn":"h2"}
 ```
+
+`request_time`, `bytes_sent`, and `protocol` are copied from Nginx variables
+`$request_time`, `$bytes_sent`, and `$server_protocol`. They are optional for
+backward compatibility; an empty value means that the variable was unavailable.
 
 The consumer owns the socket lifecycle and should bind it before NGINX workers
 start. The Go collector creates the socket with mode `0660`; set

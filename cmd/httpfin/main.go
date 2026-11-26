@@ -27,6 +27,7 @@ func main() {
 		initial = demo.Connections()
 	}
 	store := model.NewStore(initial)
+	ingestCounters := ingest.NewCounters()
 	clientBaseline, err := baseline.Load(os.Getenv("httpfin_baseline_file"))
 	if err != nil {
 		log.Printf("baseline disabled: %v", err)
@@ -36,7 +37,7 @@ func main() {
 		c = clientBaseline.Observe(c)
 		store.Add(c)
 	}
-	stopIngest, ingestHealthy, err := ingest.StartUnixDatagramWithHandler(os.Getenv("httpfin_socket"), store, nginxEventHandler)
+	stopIngest, ingestHealthy, err := ingest.StartUnixDatagramWithCounters(os.Getenv("httpfin_socket"), store, nginxEventHandler, ingestCounters)
 	if err != nil {
 		log.Printf("cannot start ingest: %v", err)
 		return
@@ -51,6 +52,7 @@ func main() {
 	mux.HandleFunc("/report", htmlReportHandler(store))
 	mux.HandleFunc("/report/material-symbols.woff2", materialSymbolsHandler)
 	mux.HandleFunc("/healthz", healthHandler(ingestHealthy))
+	mux.HandleFunc("/api/ingest", ingestStatsHandler(ingestHealthy, ingestCounters))
 	if os.Getenv("httpfin_test_endpoint") == "1" {
 		mux.HandleFunc("/__httpfin_test/unauthorized", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)

@@ -102,7 +102,7 @@ func writeObservation(w interface{ Write([]byte) (int, error) }, c model.Connect
 	fmt.Fprintf(w, "[%s] id=%s client=%s request=%s status=%d bytes=%d duration_ms=%d\n",
 		c.Timestamp.Format(time.RFC3339), fingerprint.Dash(c.ID), fingerprint.Dash(c.ClientIP),
 		redactURL(c.Method+" "+c.URL), c.Status, c.Bytes, c.ElapsedMS)
-	fmt.Fprintf(w, "  observation: point=%s evidence=%s\n", unknown(c.ObservationPoint), evidenceState(c))
+	fmt.Fprintf(w, "  observation: point=%s host=%s protocol=%s evidence=%s\n", unknown(c.ObservationPoint), unknown(c.Host), unknown(c.Protocol), evidenceState(c))
 	fmt.Fprintf(w, "  transport: protocol=%s tls=%s sni=%s alpn=%s offered_alpn=%s\n",
 		unknown(c.Protocol), unknown(c.TLSVersion), unknown(c.SNI), unknown(c.ALPN), unknown(c.ALPNOffered))
 	fmt.Fprintf(w, "  fingerprints: client_hello=%s ja3=%s ja4=%s http2=%s\n",
