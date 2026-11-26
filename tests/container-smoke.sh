@@ -28,8 +28,10 @@ fi
 
 project="httpfin-smoke-$$"
 compose="docker compose -p $project"
+load_tmp=$(mktemp -d)
 cleanup() {
 	$compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+	rm -rf "$load_tmp"
 }
 trap cleanup EXIT INT TERM
 
@@ -94,6 +96,57 @@ printf '%s\n' "$ingest" | grep -Fq '"received":'
 printf '%s\n' "$ingest" | grep -Fq '"decoded":'
 printf '%s\n' "$ingest" | grep -Fq '"stored":'
 printf '%s\n' "$ingest" | grep -Fq '"dropped":'
+
+run_load() {
+	phase=$1
+	total=$2
+	completed=0
+	while [ "$completed" -lt "$total" ]; do
+		pids=""
+		batch=0
+		while [ "$batch" -lt 20 ] && [ "$completed" -lt "$total" ]; do
+			completed=$((completed + 1))
+			curl -kfsS --max-time 5 --resolve inspector.example.test:8443:127.0.0.1 \
+				${curl_http2_args} -o /dev/null -w '%{http_code}' \
+				https://inspector.example.test:8443/app/api/catalog \
+				>"$load_tmp/$phase-$completed" 2>/dev/null &
+			pids="$pids $!"
+			batch=$((batch + 1))
+		done
+		for pid in $pids; do
+			wait "$pid"
+		done
+	done
+	for result in "$load_tmp/$phase"-*; do
+		code=$(tr -d '\r\n' < "$result")
+		if [ "$code" != "200" ]; then
+			echo "load phase $phase returned HTTP $code" >&2
+			return 1
+		fi
+	done
+}
+
+run_load warmup 200
+
+collector_pid=$($compose exec -T httpfin sh -c 'pidof httpfin')
+if [ -z "$collector_pid" ]; then
+	echo "cannot find collector process for load smoke" >&2
+	exit 1
+fi
+before=$($compose exec -T httpfin wget -qO- http://127.0.0.1:8080/api/ingest)
+$compose exec -T httpfin sh -c "kill -STOP $collector_pid"
+run_load collector-stopped 500
+$compose exec -T httpfin sh -c "kill -CONT $collector_pid"
+run_load recovery 40
+
+after=$($compose exec -T httpfin wget -qO- http://127.0.0.1:8080/api/ingest)
+printf '%s\n' "$after" | grep -Fq '"healthy":true'
+before_stored=$(printf '%s\n' "$before" | sed -n 's/.*"stored":\([0-9][0-9]*\).*/\1/p')
+after_stored=$(printf '%s\n' "$after" | sed -n 's/.*"stored":\([0-9][0-9]*\).*/\1/p')
+if [ -z "$before_stored" ] || [ -z "$after_stored" ] || [ "$after_stored" -le "$before_stored" ]; then
+	echo "collector did not resume storing events after SIGSTOP/SIGCONT" >&2
+	exit 1
+fi
 
 mock=$(curl -kfsS --resolve inspector.example.test:8443:127.0.0.1 \
 	${curl_http2_args} https://inspector.example.test:8443/app/api/catalog)

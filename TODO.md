@@ -3,21 +3,35 @@
 The main 0.2 path is complete: observation collection, JSON API, text report,
 HTML status page, TLS/HTTP modes, Docker smoke path, and documentation.
 
-## Open
+## Next priorities
 
-- Add report-contract tests for `go-http`, `go-tls`, `nginx-http-module`, and
-  absent fields.
+### High
 
-## Deferred
+- [ ] Load-test the Nginx module and Unix-datagram handoff: throughput,
+  datagram overflow, stopped or slow collector, recovery, and request latency.
+  The container smoke already covers bounded load, a paused collector, and
+  storage recovery; full stress and overflow characterization remain.
+- [ ] Add semantic comparison for two saved reports. Compare normalized
+  observations, not rendered HTML/TXT: clients, User-Agent, profile, TLS,
+  ALPN, SNI, status, timing, bytes, and observation point. Cover `go-http`,
+  `go-tls`, `nginx-http-module`, and absent fields with report-contract tests.
 
-Only return to these items when there is a concrete operational requirement:
+### Medium
 
-- stress testing Unix-datagram overflow and a slow or stopped collector;
-- a separate wire observer for raw ClientHello, standard JA3/JA4, and
-  connection-level HTTP/2 evidence;
-- `HTTP2Fingerprints` matching in baseline configuration;
-- SQLite or another durable history store;
-- automatic profile updates and distributed storage.
+- [ ] Expose collector metrics for Prometheus: `received`, `decoded`,
+  `stored`, `dropped`, handoff errors, store size, uptime, and ingest health.
+
+### Future
+
+- [ ] Design and implement a separate wire observer for raw ClientHello,
+  standard JA3/JA4, and connection-level HTTP/2 evidence. Keep it outside the
+  Nginx HTTP-module path.
+
+## Deliberately deferred
+
+SQLite or another durable history store, automatic profile updates, and
+distributed storage stay out of the near-term plan. Reopen them only when a
+concrete operational requirement appears.
 
 ## Current limits
 

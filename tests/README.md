@@ -35,6 +35,12 @@ replacement for `nginx -t`.
 ./tests/container-smoke.sh
 ```
 
+The container smoke also runs a bounded load phase against `/app/api/catalog`:
+200 warm-up requests, 500 requests while the Go collector is paused, and 40
+recovery requests after it resumes. It checks application responses and event
+storage recovery; it is an integration smoke test, not a machine-independent
+RPS benchmark.
+
 ## Dashboard bot-farm smoke test
 
 Generate synthetic browser and API-client traffic, validate the canonical
