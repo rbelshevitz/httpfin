@@ -14,6 +14,24 @@ ingress и приложением. Перед запуском нужно выб
 | Nginx `stream` passthrough | downstream-сервис | нет для Nginx | SNI, предложенный ALPN, заявленная версия TLS | проверить маршрутизацию до backend |
 | тестовый контейнер | Nginx | генерируется автоматически | HTTPS/SNI/HTTP/2 | smoke-тест интеграции |
 
+## Архитектура и границы наблюдения
+
+```text
+клиент → Nginx → приложение
+           └─ модуль httpfin → Unix-датаграмма → Go-сборщик → API/UI/отчёт
+```
+
+Nginx продолжает обслуживать запросы, если сборщик недоступен. Модуль после
+обработки запроса отправляет ограниченное неблокирующее событие: он не ждёт Go
+и не выполняет в worker HTTP-, DNS-, database- или fingerprint-операции. Go
+нормализует событие, хранит ограниченную историю в памяти и отдаёт UI и отчёты.
+После перезапуска наблюдения исчезают.
+
+Событие Nginx содержит ID запроса, метод, URI, Host, User-Agent, исходный адрес,
+статус, время запроса, размер ответа, протокол, TLS version, SNI и ALPN, если
+они доступны. После TLS termination исходный ClientHello недоступен, поэтому
+этот путь не вычисляет стандартные JA3/JA4 и fingerprint соединения HTTP/2.
+
 ## 1. Отладка API без TLS
 
 Используйте этот режим, когда нужно понять, что реально дошло до обработчика:
@@ -177,8 +195,8 @@ SQLite сейчас не является обязательной частью 
 ### DevOps/SRE после изменения ingress
 
 1. Выполнить один и тот же запрос напрямую в приложение и через Nginx.
-2. Сравнить SNI, negotiated ALPN, HTTP protocol, client IP, status и latency.
-3. Проверить `/api/connections` и access log.
+2. Сравнить SNI, negotiated ALPN, HTTP protocol, client IP, status и время запроса.
+3. Проверить `/api/connections`, `/api/ingest` и access log.
 4. Если Nginx менялся — убедиться, что модуль пересобран под ту же версию.
 
 ### API-тестировщику
@@ -198,16 +216,15 @@ curl -sS http://127.0.0.1:8080/api/connections
 ```
 
 Не считать отсутствие события в Go доказательством отсутствия запроса: handoff
-является best-effort telemetry. Для полного аудита сохраняйте access log и
-сверяйте его с `/api/connections`; отдельных счётчиков потерь пока нет.
+является best-effort telemetry. `/api/ingest` показывает состояние событий,
+которые достигли socket сборщика, но не потери до этой точки. Для полного
+аудита сохраняйте access log и сверяйте его с `/api/connections`.
 
 ## Связанные документы
 
-- [`ARCHITECTURE.ru.md`](ARCHITECTURE.ru.md) — схемы режимов наблюдения и потока данных;
-
 - [`README.ru.md`](../README.ru.md) — быстрый старт;
 - [`DEVOPS_RUNBOOK.ru.md`](DEVOPS_RUNBOOK.ru.md) — эксплуатационная диагностика;
-- [`USE_CASES_TEAM.ru.md`](USE_CASES_TEAM.ru.md) — роли DevOps, QA, backend и security;
+- [`USE_CASES.ru.md`](USE_CASES.ru.md) — практические сценарии для API, QA и эксплуатации;
 - [`nginx-module/README.md`](../nginx-module/README.md) — C-модуль и ABI-ограничения.
 
 Протокольные источники: [RFC 9846](https://www.rfc-editor.org/rfc/rfc9846),

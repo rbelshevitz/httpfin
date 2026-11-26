@@ -3,6 +3,15 @@
 `httpfin` is useful when the response body alone does not explain a client or
 proxy problem.
 
+## QA quick check
+
+1. Check `/healthz` and expect `204`.
+2. Send the agreed request through the product entry point.
+3. Verify the product response, then find the observation in
+   `/api/connections`.
+4. Save `/api/report` with the test result. Use `/api/ingest` when checking
+   whether the Nginx handoff reached the collector.
+
 ## API client debugging
 
 Send the same request through ordinary curl, an SDK, a browser and
@@ -64,4 +73,4 @@ of treating every change as abuse.
 - [RFC 9849 — Encrypted ClientHello](https://www.rfc-editor.org/rfc/rfc9849)
 
 For the meaning and limitations of JA3, JA3S, JA4 and JA4H, see
-[`ARCHITECTURE.md`](ARCHITECTURE.md).
+[`WIRE_OBSERVER.md`](WIRE_OBSERVER.md).

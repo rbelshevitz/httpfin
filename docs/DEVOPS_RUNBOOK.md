@@ -8,8 +8,8 @@
 - which source address does the edge actually see;
 - which SNI and ALPN arrived from the client;
 - was HTTP/2 or HTTP/1.1 selected;
-- where did latency appear;
-- were telemetry events dropped because of Unix-socket backpressure;
+- what request time did the observation point measure;
+- whether the Nginx-to-collector handoff reported backpressure or another error;
 - can the result be attached to an incident ticket as a readable report.
 
 ## Run the Docker image
@@ -25,11 +25,18 @@ docker run --rm -p 8443:8443 httpfin:dev
 curl -k --resolve inspector.example.test:8443:127.0.0.1 \
   https://inspector.example.test:8443/healthz
 curl -k --resolve inspector.example.test:8443:127.0.0.1 \
+  https://inspector.example.test:8443/api/ingest
+curl -k --resolve inspector.example.test:8443:127.0.0.1 \
   https://inspector.example.test:8443/api/report
 ```
 
 The generated certificate is for diagnostics only. Mount a real certificate
 and key into `/etc/nginx/certs` in production.
+
+This image is a demo/smoke environment: `/app/` is served by the bundled mock
+API. It is not a production reverse proxy configuration. For a real
+application, use the host/systemd deployment and point Nginx at that
+application.
 
 ## Post-deployment checks
 
@@ -56,12 +63,14 @@ request; they begin when a datagram reaches the collector socket.
 
 Possible module states include `sent`, `unavailable`,
 `dropped_backpressure`, `dropped_error`, and `oversize`. Backpressure is a
-telemetry-load signal, not a reason to block a request. Use access logs or a
-durable queue for lossless audit requirements.
+telemetry-load signal, not a reason to block a request. The collector counters
+start only after a datagram reaches its socket, so use the Nginx handoff field
+and access logs when investigating losses before that point. Use a durable
+queue for lossless audit requirements.
 
 ### Client address
 
-Configure trusted proxy hops explicitly:
+Configure trusted proxy hops explicitly, for example:
 
 ```nginx
 set_real_ip_from 10.0.0.0/8;

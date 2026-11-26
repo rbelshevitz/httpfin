@@ -4,6 +4,14 @@ httpfin полезен как диагностический стенд и ка�
 помогает сравнивать сетевое поведение клиентов, прокси и API-маршрутов, но не
 удостоверяет личность клиента и не применяет правила доступа.
 
+## Быстрая проверка для QA
+
+1. Открыть `/healthz`; ожидаемый ответ — `204`.
+2. Выполнить согласованный запрос через входную точку приложения.
+3. Проверить ответ приложения и найти наблюдение в `/api/connections`.
+4. Сохранить `/api/report` вместе с результатом теста. Если нужно проверить
+   доставку события до сборщика, запросить `/api/ingest`.
+
 ## 1. Отладка собственного API-клиента
 
 Цель — понять, чем реально отличается клиент от браузера или эталонного `curl-impersonate`.
@@ -221,5 +229,5 @@ JA3/JA4 не заменяют RFC-модель и не должны называ
 - [NGINX ssl_preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html) — SNI/ALPN из ClientHello без termination;
 - [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) — исходная спецификация TLS 1.3, заменённая RFC 9846;
 - [RFC 9849](https://www.rfc-editor.org/rfc/rfc9849) — Encrypted ClientHello;
-- [`ARCHITECTURE.ru.md`](ARCHITECTURE.ru.md) — расшифровка JA3/JA3S/JA4/JA4H и диаграммы границ наблюдения;
+- [`WIRE_OBSERVER.ru.md`](WIRE_OBSERVER.ru.md) — ограничения анализа ClientHello и HTTP/2;
 - [Squid logformat](https://www.squid-cache.org/Doc/config/logformat/) — поля и модель access report.

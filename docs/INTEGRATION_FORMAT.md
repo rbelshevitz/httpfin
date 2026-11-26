@@ -86,6 +86,12 @@ The event feeds `/api/connections`. Exact JA3/JA4 and HTTP/2 fingerprints need
 raw ClientHello and connection-frame observation; one post-termination request
 does not contain enough information.
 
+The collector-side handoff counters are available at `/api/ingest`:
+`received` counts datagrams read from the socket, `decoded` counts valid JSON,
+`stored` counts events passed into storage, and `dropped` counts malformed or
+invalid events. These counters do not include losses before a datagram reaches
+the collector socket.
+
 ## Reports
 
 The report is a diagnostic artifact built from collector observations. It
@@ -157,7 +163,7 @@ nginx -t
 See [Nginx configure](https://nginx.org/en/docs/configure.html),
 [dynamic modules](https://docs.nginx.com/nginx/admin-guide/dynamic-modules/),
 [SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html),
-and the complete [observation model](ARCHITECTURE.md). Protocol sources are
+and the complete observation model in [the operating modes guide](OPERATING_MODES.md). Protocol sources are
 [RFC 9846](https://www.rfc-editor.org/rfc/rfc9846) and historical
 [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) for TLS 1.3,
 [RFC 6066](https://www.rfc-editor.org/rfc/rfc6066) for SNI,

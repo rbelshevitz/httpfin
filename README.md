@@ -237,12 +237,13 @@ If Alpine cannot download packages because of DNS, retry the build with
 
 ## Documentation
 
-- [`docs/USE_CASES_TEAM.md`](docs/USE_CASES_TEAM.md) — workflows for DevOps, QA, and developers;
+- [`docs/USE_CASES.md`](docs/USE_CASES.md) — practical workflows for API, QA, and operations;
 - [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md) — TLS, certificates, and Nginx modes;
 - [`docs/INTEGRATION_FORMAT.md`](docs/INTEGRATION_FORMAT.md) — module events and report format;
 - [`docs/WIRE_OBSERVER.md`](docs/WIRE_OBSERVER.md) — ClientHello and HTTP/2 boundaries;
 - [`docs/DEVOPS_RUNBOOK.md`](docs/DEVOPS_RUNBOOK.md) — operational troubleshooting;
 - [`docs/OBSERVATION_SEMANTICS.md`](docs/OBSERVATION_SEMANTICS.md) — exact semantics of Risk, Baseline, and evidence;
+- [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md) — security and reliability audit;
 - [`TODO.md`](TODO.md) — current work plan.
 
 ## Development checks

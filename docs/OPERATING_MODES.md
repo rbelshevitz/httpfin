@@ -9,6 +9,25 @@ Choose the observation point before deploying `httpfin`.
 | Nginx TLS termination | Nginx | no | Nginx TLS fields + HTTP handoff | production ingress |
 | Nginx TLS passthrough | downstream service | no for Nginx | SNI, offered ALPN, advertised TLS version | routing diagnostics |
 
+## Architecture and boundaries
+
+```text
+Client → Nginx → application
+           └─ httpfin module → Unix datagram → Go collector → API/UI/report
+```
+
+Nginx continues serving requests if the collector is unavailable. The module
+sends a bounded, non-blocking event after request processing; it does not wait
+for Go or perform HTTP, DNS, database, or fingerprint work in the worker. Go
+normalizes the event, stores a bounded in-memory history, and serves the UI and
+reports. Runtime observations are lost on restart.
+
+The Nginx event contains request ID, method, URI, Host, User-Agent, source
+address, status, request time, response size, protocol, TLS version, SNI, and
+ALPN when available. It does not contain the original ClientHello after TLS
+termination, so standard JA3/JA4 and connection-level HTTP/2 fingerprints are
+not calculated by this path.
+
 ## Direct HTTPS
 
 The Go listener needs a certificate and private key because it terminates TLS:
@@ -94,11 +113,11 @@ behavior, and recovery before it is considered production-ready.
   transport behavior as well as response bodies.
 - Security: use fingerprints as triage signals and combine them with rate,
   authentication, IP reputation, and application logs.
-- Incident response: preserve `/api/report`, access logs, Nginx version, and
+- Incident response: preserve `/api/report`, `/api/ingest`, access logs, Nginx version, and
   OpenSSL version together so a transport change can be reproduced.
 
-The complete Russian runbook is in [`OPERATING_MODES.ru.md`](OPERATING_MODES.ru.md).
-The architecture diagrams are in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+The Russian version is in [`OPERATING_MODES.ru.md`](OPERATING_MODES.ru.md).
+For operational checks, use [`DEVOPS_RUNBOOK.md`](DEVOPS_RUNBOOK.md).
 
 ## Protocol sources
 

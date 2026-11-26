@@ -235,13 +235,13 @@ docker rm -f httpfin
 
 ## Документация
 
-- [`docs/USE_CASES_TEAM.ru.md`](docs/USE_CASES_TEAM.ru.md) — сценарии для DevOps, QA и разработчиков;
-- [`docs/NONTECHNICAL.ru.md`](docs/NONTECHNICAL.ru.md) — инструкция для нетехнических сотрудников;
+- [`docs/USE_CASES.ru.md`](docs/USE_CASES.ru.md) — практические сценарии для API, QA и эксплуатации;
 - [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md) — TLS, сертификаты и режимы Nginx;
 - [`docs/INTEGRATION_FORMAT.ru.md`](docs/INTEGRATION_FORMAT.ru.md) — событие модуля и формат отчёта;
 - [`docs/WIRE_OBSERVER.ru.md`](docs/WIRE_OBSERVER.ru.md) — границы ClientHello и HTTP/2;
 - [`docs/DEVOPS_RUNBOOK.ru.md`](docs/DEVOPS_RUNBOOK.ru.md) — эксплуатационная диагностика;
 - [`docs/OBSERVATION_SEMANTICS.ru.md`](docs/OBSERVATION_SEMANTICS.ru.md) — точная семантика Risk, Baseline и evidence;
+- [`docs/SECURITY_AUDIT.ru.md`](docs/SECURITY_AUDIT.ru.md) — аудит безопасности и надёжности;
 - [`TODO.ru.md`](TODO.ru.md) — текущий план работ.
 
 ## Проверки разработки
