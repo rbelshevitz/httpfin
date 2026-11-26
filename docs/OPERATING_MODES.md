@@ -77,6 +77,31 @@ For a host-installed Nginx, use the same idea with paths such as
 `/etc/nginx/tls/api.example.test.key`, and reference them from
 `ssl_certificate` and `ssl_certificate_key`.
 
+For a local smoke test, create a short-lived self-signed certificate and map
+the example hostname to localhost:
+
+```bash
+sudo install -d -m 0750 /etc/nginx/tls
+sudo openssl req -x509 -nodes -newkey rsa:2048 -days 7 \
+  -keyout /etc/nginx/tls/api.example.test.key \
+  -out /etc/nginx/tls/api.example.test.fullchain.pem \
+  -subj '/CN=api.example.test' \
+  -addext 'subjectAltName=DNS:api.example.test'
+echo '127.0.0.1 api.example.test' | sudo tee -a /etc/hosts
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Use `curl -k` only for this local certificate. For a real public hostname,
+obtain a trusted certificate, for example with Certbot:
+
+```bash
+sudo certbot --nginx -d api.example.com
+```
+
+Certbot normally keeps the certificate and private key under
+`/etc/letsencrypt/live/api.example.com/`. Never use a self-signed certificate
+in production, and keep the private key readable only by Nginx.
+
 After termination, the original ClientHello is not forwarded to the upstream.
 Use Nginx TLS variables for operational diagnostics. Exact JA3/JA4 requires
 capturing ClientHello before termination.
