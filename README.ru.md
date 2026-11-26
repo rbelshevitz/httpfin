@@ -107,6 +107,33 @@ server {
 }
 ```
 
+Для локального smoke-теста создайте самоподписанный сертификат и направьте
+примерное имя хоста на localhost:
+
+```bash
+sudo install -d -m 0750 /etc/nginx/tls
+sudo openssl req -x509 -nodes -newkey rsa:2048 -days 7 \
+  -keyout /etc/nginx/tls/api.example.test.key \
+  -out /etc/nginx/tls/api.example.test.fullchain.pem \
+  -subj '/CN=api.example.test' \
+  -addext 'subjectAltName=DNS:api.example.test'
+echo '127.0.0.1 api.example.test' | sudo tee -a /etc/hosts
+sudo nginx -t && sudo systemctl reload nginx
+curl -kfsS https://api.example.test/health
+```
+
+Опция `-k` нужна только для этого локального самоподписанного сертификата. Для
+реального имени используйте доверенный сертификат, например через Certbot:
+
+```bash
+sudo certbot --nginx -d api.example.com
+```
+
+Обычно Certbot создаёт файлы в
+`/etc/letsencrypt/live/api.example.com/`; укажите эти пути в
+`ssl_certificate` и `ssl_certificate_key` либо смонтируйте сертификаты в пути
+из примера. Самоподписанный сертификат нельзя использовать в production.
+
 Полная установка модуля, права на сокет и TLS-конфигурация описаны в
 [`docs/OPERATING_MODES.ru.md`](docs/OPERATING_MODES.ru.md).
 

@@ -108,6 +108,33 @@ server {
 }
 ```
 
+For a local smoke test, create a self-signed certificate and map the example
+hostname to localhost:
+
+```bash
+sudo install -d -m 0750 /etc/nginx/tls
+sudo openssl req -x509 -nodes -newkey rsa:2048 -days 7 \
+  -keyout /etc/nginx/tls/api.example.test.key \
+  -out /etc/nginx/tls/api.example.test.fullchain.pem \
+  -subj '/CN=api.example.test' \
+  -addext 'subjectAltName=DNS:api.example.test'
+echo '127.0.0.1 api.example.test' | sudo tee -a /etc/hosts
+sudo nginx -t && sudo systemctl reload nginx
+curl -kfsS https://api.example.test/health
+```
+
+The `-k` option is only for this local self-signed certificate. For a real
+hostname, use a trusted certificate, for example with Certbot:
+
+```bash
+sudo certbot --nginx -d api.example.com
+```
+
+Certbot normally places the files under
+`/etc/letsencrypt/live/api.example.com/`; point `ssl_certificate` and
+`ssl_certificate_key` there, or copy/mount them to the paths above. Never use a
+self-signed certificate in production.
+
 See [`docs/OPERATING_MODES.md`](docs/OPERATING_MODES.md) for module
 installation, socket permissions, and TLS configuration.
 
