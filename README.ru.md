@@ -97,6 +97,9 @@ server {
     listen 443 ssl;
     server_name api.example.test;
 
+    ssl_certificate     /etc/nginx/tls/api.example.test.fullchain.pem;
+    ssl_certificate_key /etc/nginx/tls/api.example.test.key;
+
     httpfin on;
     location / {
         proxy_pass http://your_application;
