@@ -124,7 +124,8 @@ Go: `received`, `decoded`, `stored` и `dropped`. Они не учитывают
 
 ### 2. Unix datagram от модуля
 
-Модуль отправляет компактное событие:
+Модуль отправляет компактное событие. Заголовки ответа пока не входят в
+контракт события; это отдельное расширение Nginx-модуля:
 
 ```json
 {"version":1,"request_id":"15-0","method":"GET","uri":"/healthz","host":"inspector.example.test","user_agent":"curl/8.10.1","remote_addr":"172.17.0.1","status":204,"request_time":"0.001","bytes_sent":"0","protocol":"HTTP/2.0","tls_version":"TLS 1.3","sni":"inspector.example.test","alpn":"h2"}

@@ -1,11 +1,76 @@
-# Нюансы реализации wire observer
+# TLS/HTTP2 connection observer: проектная записка
 
-> **Статус: проектная записка.** Wire observer пока не реализован в текущем
-> релизе. Отдельного процесса, пути захвата raw-пакетов, вычисления стандартных
-> JA3/JA4 и наблюдения за HTTP/2-соединением сейчас нет.
+> **Статус: проектная записка.** TLS/HTTP2 connection observer пока не
+> реализован в текущем релизе. Отдельного процесса, пути захвата raw-пакетов,
+> вычисления стандартных JA3/JA4 и наблюдения за HTTP/2-соединением сейчас нет.
 
-Документ описывает будущую границу наблюдения raw TLS и HTTP/2 и отделяет
-connection-level признаки от request-level данных текущего HTTP-модуля.
+Документ описывает будущий TLS/HTTP2 connection observer и отделяет признаки на
+уровне соединения от request-level данных текущего HTTP-модуля.
+
+## Рекомендуемая реализация
+
+Первую версию стоит писать на Go отдельным package и command в этом репозитории.
+`crypto/tls` даст доступ к доступным полям `ClientHelloInfo`; слой наблюдения
+за HTTP/2 добавляется там, где компонент владеет уже расшифрованным соединением.
+Observer не должен работать внутри Nginx worker. Его записи нужно связывать с
+наблюдениями httpfin через явный connection ID или request ID.
+
+## План прототипа и библиотеки Go
+
+Первый прототип должен быть локальным и включаемым явно Go-listener. Он
+принимает TLS-соединение, назначает connection ID, сохраняет ограниченный
+префикс bytes, которые читает `tls.Server`, и выдаёт одну versioned observation
+record. Текущий Nginx-модуль менять не нужно; packet capture тоже не нужен.
+Прототип полезен даже при ошибке parser: лимит capture, ошибка разбора и исход
+handshake сами являются данными о качестве наблюдения.
+
+| Кандидат | Роль в прототипе | Решение |
+|---|---|---|
+| Go `crypto/tls` | Direct TLS termination, `ClientHelloInfo`, negotiated TLS/ALPN | Обязательная основа; стандартная библиотека |
+| Go `x/net/http2` | Наблюдение HTTP/2 frames и SETTINGS там, где observer владеет соединением | Использовать только на connection-aware границе; не зависеть от внутренних деталей `net/http` |
+| `github.com/psanford/tlsfingerprint` | Кандидат для JA3/JA4 из входящего ClientHello | Проверить в spike через adapter и fixtures перед подключением |
+| `github.com/dreadl0ck/ja3` | Кандидат и comparison oracle для JA3 | Сначала только в тестах; packet-decoding dependency не нужна первому capture path |
+| `github.com/google/gopacket` | PCAP/L4 capture и packet decoding | Отложить: не решает наблюдение расшифрованного HTTP/2 |
+| `github.com/refraction-networking/utls` | Формирование ClientHello и client impersonation | Не использовать для observer; пригодится для генерации тестовых клиентов |
+
+Готовые fingerprint-пакеты — сторонний код, а не источник истины протокола.
+Модель входных данных observer нужно держать независимой от них: тогда parser
+можно заменить, сравнить две реализации и сохранить raw normalized fields.
+
+### Этапы прототипа
+
+1. **Capture:** bounded `net.Conn` tee перед `tls.Server`; никакого второго
+   reader и чтения `ClientHelloInfo.Conn` в callback.
+2. **Parse:** разобрать один полный ClientHello либо вернуть `incomplete`,
+   `malformed` или `limit_exceeded`; сохранить normalized cipher, extension,
+   group, signature, SNI и ALPN inputs.
+3. **Fingerprint:** считать JA3 и JA4 только при полном наборе входных данных;
+   отдельно хранить версии algorithm/parser, GREASE policy, normalized input и
+   digest.
+4. **HTTP/2:** переходить к нему только когда ALPN выбрал `h2` и observer владеет
+   расшифрованным соединением; сохранять preface, initial SETTINGS, ACK и
+   summary streams/frames — без значений headers и body.
+5. **Join:** публиковать connection evidence отдельно, а requests связывать по
+   доверенному `connection_id` и HTTP/2 `stream_id`. Нельзя угадывать связь по IP
+   и времени.
+
+### Fixtures и критерии готовности
+
+Для code review прототип должен иметь offline fixtures для TLS 1.2 и 1.3, SNI и
+его отсутствия, `h2` и `http/1.1`, GREASE, resumption, HelloRetryRequest,
+обрезанного и чрезмерно большого ClientHello. Трафик можно генерировать
+стандартным Go-клиентом, `curl` и browser-like clients, но их User-Agent не
+является эталоном.
+
+Каждый fixture должен проверять parsed fields, canonical JA3/JA4 input, digest,
+статус capture и failure state. Direct-TLS smoke должен доказать, что обрезанный
+capture не ломает handshake и что request path Nginx не изменился. На соединение
+должен быть жёсткий memory limit; raw payload по умолчанию не попадает в обычный
+отчёт.
+
+Первый milestone должен закончиться на capture ClientHello и fingerprints.
+HTTP/2 — второй milestone: стандартный `net/http` обычно владеет соединением,
+поэтому frame observer требует явной точки владения или tee.
 
 ## Что доступно в разных точках
 
@@ -18,7 +83,7 @@ connection-level признаки от request-level данных текущег
 | L4 sidecar до TLS termination | доступны raw bytes | да, при наличии parser | только при расшифрованном HTTP/2 | plaintext headers нет |
 
 Текущий Nginx-модуль остаётся request-level адаптером. Он не должен объявлять
-JA3/JA4 или HTTP/2 fingerprint по данным своего hook.
+JA3/JA4 или HTTP/2 fingerprint по данным своего request-level hook.
 
 ## Схема записи наблюдения
 
@@ -35,7 +100,7 @@ JA3/JA4 или HTTP/2 fingerprint по данным своего hook.
     "name": "tls.ja4",
     "value": "t13d1516h2_...",
     "state": "inferred",
-    "source": "go-wire-observer",
+    "source": "go-tls-http2-observer",
     "observation_point": "before_tls_server",
     "parser_version": "clienthello/1",
     "algorithm_version": "ja4-tls/1",
@@ -60,7 +125,7 @@ fingerprint.
 
 Connection и request identity нужно хранить раздельно. Одно TLS-соединение
 может обслуживать много HTTP/2 requests, а request может прийти без записи
-wire observer. Нельзя связывать записи только по source IP и времени.
+TLS/HTTP2 observer. Нельзя связывать записи только по source IP и времени.
 
 ## TLS
 
@@ -166,6 +231,11 @@ path не получит fixtures и измеряемые loss counters.
 - [RFC 8701: GREASE](https://www.rfc-editor.org/rfc/rfc8701.html)
 - [RFC 9849: TLS Encrypted Client Hello](https://www.rfc-editor.org/rfc/rfc9849.html)
 - [Go `crypto/tls.ClientHelloInfo`](https://pkg.go.dev/crypto/tls#ClientHelloInfo)
+- [Go `x/net/http2` frame API](https://pkg.go.dev/golang.org/x/net/http2)
 - [RFC 9113: HTTP/2](https://www.rfc-editor.org/rfc/rfc9113.html)
 - [Nginx stream SSL preread](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html)
+- [`psanford/tlsfingerprint`: кандидат Go-библиотеки для JA3/JA4](https://github.com/psanford/tlsfingerprint)
+- [`dreadl0ck/ja3`: кандидат Go-библиотеки для JA3](https://github.com/dreadl0ck/ja3)
+- [`google/gopacket`: packet и PCAP decoding](https://github.com/google/gopacket)
+- [`refraction-networking/utls`: client-side TLS fingerprint construction](https://github.com/refraction-networking/utls)
 - [JA4 technical details](https://github.com/FoxIO-LLC/ja4/blob/main/technical_details/JA4.md)

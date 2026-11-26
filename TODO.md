@@ -23,9 +23,9 @@ HTML status page, TLS/HTTP modes, Docker smoke path, and documentation.
 
 ### Future
 
-- [ ] Design and implement a separate wire observer for raw ClientHello,
-  standard JA3/JA4, and connection-level HTTP/2 evidence. Keep it outside the
-  Nginx HTTP-module path.
+- [ ] Design and implement a separate TLS/HTTP2 connection observer in Go for
+  raw ClientHello, standard JA3/JA4, and connection-level HTTP/2 evidence. Keep
+  it outside the Nginx HTTP-module path.
 
 ## Deliberately deferred
 

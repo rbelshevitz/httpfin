@@ -1,12 +1,80 @@
-# Wire observer implementation notes
+# TLS/HTTP2 connection observer: design notes
 
-> **Status: design document.** The wire observer is not implemented in the
-> current release. There is no separate wire-observer process, raw-packet
-> capture path, standard JA3/JA4 calculation, or HTTP/2 connection observer.
+> **Status: design document.** The TLS/HTTP2 connection observer is not
+> implemented in the current release. There is no separate observer process,
+> raw-packet capture path, standard JA3/JA4 calculation, or HTTP/2 connection
+> observer.
 
-This document defines the future raw-TLS and HTTP/2 observation boundary. It
-separates connection-level evidence from the request-level data collected by
-the current HTTP module.
+This document defines the future TLS/HTTP2 connection observer. It separates
+connection-level evidence from the request-level data collected by the current
+HTTP module.
+
+## Recommended implementation
+
+Write the first version in Go as a separate package and command in this
+repository. Use `crypto/tls` to own the direct TLS listener and capture the
+available `ClientHelloInfo` fields; add a connection-aware HTTP/2 layer only
+where the observer owns the decrypted connection. Keep the observer out of the
+Nginx worker and join its records with httpfin observations through an explicit
+connection or request ID.
+
+## Prototype plan and Go library shortlist
+
+The first prototype should be a local, opt-in Go listener. It should accept a
+TLS connection, assign a connection ID, retain a bounded prefix of the bytes
+read by `tls.Server`, and emit one versioned observation record. It must not
+change the current Nginx module or require packet capture. The prototype is
+useful even when parsing fails: capture limits, parser errors, and handshake
+outcomes are evidence about the observation path.
+
+| Candidate | Use in the prototype | Decision |
+|---|---|---|
+| Go `crypto/tls` | Direct TLS termination, `ClientHelloInfo`, negotiated TLS/ALPN | Required base; standard library |
+| Go `x/net/http2` | HTTP/2 frame and SETTINGS observation where the observer owns the connection | Use only at a connection-aware boundary; do not depend on `net/http` internals |
+| `github.com/psanford/tlsfingerprint` | Candidate parser/calculator for JA3 and JA4 from an incoming ClientHello | Spike behind an adapter; pin and verify against fixtures before adopting |
+| `github.com/dreadl0ck/ja3` | Candidate JA3 implementation and comparison oracle | Test-only comparison initially; its packet-decoding dependency is unnecessary for the first capture path |
+| `github.com/google/gopacket` | PCAP/L4 capture and packet decoding | Defer; it does not solve the terminated HTTP/2 observation problem |
+| `github.com/refraction-networking/utls` | ClientHello construction and client impersonation | Do not use for the observer; useful for generating test clients |
+
+The ready-made fingerprint packages are third-party code, not protocol
+authority. Keep the observer's input model independent from them so the
+project can replace a parser, compare two implementations, and retain the raw
+normalized fields.
+
+### Prototype stages
+
+1. **Capture:** bounded `net.Conn` tee before `tls.Server`; no second reader and
+   no read from `ClientHelloInfo.Conn` in the callback.
+2. **Parse:** decode one complete ClientHello or report `incomplete`,
+   `malformed`, or `limit_exceeded`; retain normalized cipher, extension,
+   group, signature, SNI, and ALPN inputs.
+3. **Fingerprint:** calculate JA3 and JA4 only when required inputs are
+   complete; store algorithm/parser versions, GREASE policy, normalized input,
+   and digest separately.
+4. **HTTP/2:** only after ALPN selects `h2` and the observer owns the
+   decrypted connection; record preface, initial SETTINGS, ACKs, and a
+   stream/frame summary without header values or bodies.
+5. **Join:** publish connection evidence independently, then link requests by
+   trusted `connection_id` and HTTP/2 `stream_id`. Never infer the link from IP
+   and time alone.
+
+### Fixtures and acceptance criteria
+
+The prototype is ready for review when it has offline fixtures for TLS 1.2 and
+1.3, SNI and no-SNI, `h2` and `http/1.1`, GREASE, resumption,
+HelloRetryRequest, truncated and oversized ClientHello messages. Generate test
+traffic with the standard Go client, `curl`, and browser-like clients, but do
+not use their claimed User-Agent as ground truth.
+
+Each fixture must assert parsed fields, canonical JA3/JA4 input, the digest,
+capture status, and failure state. A direct-TLS smoke test must prove that a
+truncated capture does not break the handshake and that the Nginx request path
+remains unchanged. Memory must be bounded per connection; raw payloads are not
+stored in the normal report by default.
+
+The first milestone stops after ClientHello capture and fingerprints. HTTP/2 is
+a second milestone because standard `net/http` normally owns the connection;
+frame observation needs an explicit ownership or tee boundary.
 
 ## What each observation point can know
 
@@ -19,7 +87,7 @@ the current HTTP module.
 | L4 sidecar before TLS termination | raw bytes available | yes, with a parser | only if it also observes decrypted HTTP/2 | no plaintext headers |
 
 The current Nginx module stays in the fourth column. It must not claim JA3/JA4
-or HTTP/2 fingerprints from that hook.
+or HTTP/2 fingerprints from that request-level hook.
 
 ## Observation record schema
 
@@ -36,7 +104,7 @@ forward-compatible:
     "name": "tls.ja4",
     "value": "t13d1516h2_...",
     "state": "inferred",
-    "source": "go-wire-observer",
+    "source": "go-tls-http2-observer",
     "observation_point": "before_tls_server",
     "parser_version": "clienthello/1",
     "algorithm_version": "ja4-tls/1",
@@ -61,7 +129,7 @@ fingerprint.
 
 The schema must preserve connection and request identity separately. One TLS
 connection can carry many HTTP/2 requests; a request can also arrive without a
-wire observer record. Joining by source IP and timestamp alone is forbidden.
+TLS/HTTP2 observer record. Joining by source IP and timestamp alone is forbidden.
 
 ## TLS details
 
@@ -171,6 +239,11 @@ TLS path has fixtures and measurable loss counters.
 - [RFC 8701: GREASE](https://www.rfc-editor.org/rfc/rfc8701.html)
 - [RFC 9849: TLS Encrypted Client Hello](https://www.rfc-editor.org/rfc/rfc9849.html)
 - [Go `crypto/tls.ClientHelloInfo`](https://pkg.go.dev/crypto/tls#ClientHelloInfo)
+- [Go `x/net/http2` frame API](https://pkg.go.dev/golang.org/x/net/http2)
 - [RFC 9113: HTTP/2](https://www.rfc-editor.org/rfc/rfc9113.html)
 - [Nginx stream SSL preread module](https://nginx.org/en/docs/stream/ngx_stream_ssl_preread_module.html)
+- [`psanford/tlsfingerprint`: Go JA3/JA4 candidate](https://github.com/psanford/tlsfingerprint)
+- [`dreadl0ck/ja3`: Go JA3 candidate](https://github.com/dreadl0ck/ja3)
+- [`google/gopacket`: packet and PCAP decoding](https://github.com/google/gopacket)
+- [`refraction-networking/utls`: client-side TLS fingerprint construction](https://github.com/refraction-networking/utls)
 - [JA4 technical details](https://github.com/FoxIO-LLC/ja4/blob/main/technical_details/JA4.md)

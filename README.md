@@ -15,6 +15,33 @@ edge, then presents them through a JSON API, UI, and readable text report.
 Use it to compare browsers, SDKs, proxies, ingress changes, and reference
 traffic from `curl-impersonate` at the same observation point.
 
+## What httpfin can see
+
+```mermaid
+flowchart LR
+    C[Client]
+    N[Nginx / Go TLS]
+    A[Application]
+    H["HTTP level<br/>method · URL · status · UA · IP · timing · bytes"]
+    T["TLS edge<br/>version · SNI · ALPN"]
+    W["TLS/HTTP2 connection observer<br/>ClientHello · JA3/JA4 · HTTP/2 SETTINGS"]
+
+    C -->|TLS + HTTP| N
+    N -->|HTTP| A
+    N --> H
+    N --> T
+    C -.->|before TLS termination| W
+
+    classDef current fill:#eaf6ee,stroke:#2f7d4a,color:#123b21
+    classDef future fill:#f4f4f4,stroke:#777,color:#333,stroke-dasharray:5 5
+    class H,T current
+    class W future
+```
+
+The green levels are available in the current product. The dashed level is a
+future connection-level component; it is not required for the main API
+diagnostic workflow.
+
 ## Why this tool is useful
 
 When an API behaves unexpectedly, a normal test shows only the status and
@@ -164,12 +191,18 @@ User-Agent, source address, final HTTP status, negotiated TLS version, SNI,
 and ALPN. It also sends request time, response size, and server protocol. The
 event goes to Go after request processing through a non-blocking Unix datagram.
 
-At that stage the original `ClientHello` is no longer available. Therefore the
-current module:
+At the Nginx HTTP phase, the original `ClientHello` is no longer available.
+This creates two hard boundaries for the current module:
 
-- does not calculate standard JA3 or JA4;
-- does not collect an HTTP/2 fingerprint or connection settings;
-- does not include response headers in its event.
+- standard JA3/JA4 cannot be reconstructed at this point; collecting them
+  requires a TLS/HTTP2 connection observer before TLS termination or a raw
+  ClientHello capture;
+- HTTP/2 connection settings and fingerprints require a connection-aware
+  observer and cannot come from this request-level hook.
+
+Response headers are a separate, achievable extension: Nginx can observe them,
+but the current event schema does not include them yet. Adding response headers
+would extend the module contract; it would not require JA3/JA4 collection.
 
 Timing and response size are normalized into `elapsed_ms` and `bytes` when the
 Nginx variables are available; missing values remain zero.

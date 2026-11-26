@@ -73,8 +73,9 @@ Docker, one entrypoint starts both processes.
 
 The module sends version `1` JSON containing request ID, method, URI, host,
 User-Agent, source address, status, Nginx request time, bytes sent, HTTP
-protocol, TLS version, SNI, and negotiated ALPN. The request time, byte count,
-and protocol are copied from `$request_time`, `$bytes_sent`, and
+protocol, TLS version, SNI, and negotiated ALPN. Response headers are outside
+the current event schema. The request time, byte count, and protocol are copied
+from `$request_time`, `$bytes_sent`, and
 `$server_protocol`; they are optional for backward compatibility. Empty TLS or
 access fields mean that the corresponding Nginx variable was unavailable.
 
